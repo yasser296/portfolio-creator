@@ -345,6 +345,224 @@ app.post('/api/admin/projects', async (req, res) => {
   }
 });
 
+// POST /api/projects (user classique)
+app.post('/api/projects', async (req, res) => {
+  try {
+    const { user_id, title, description, technologies, image_url, github_url, demo_url, featured = false } = req.body;
+    if (!user_id || !title || !description) {
+      return res.status(400).json({ success: false, message: "user_id, titre et description sont requis" });
+    }
+    const result = await pool.query(`
+      INSERT INTO projects 
+      (user_id, title, description, technologies, image_url, github_url, demo_url, featured)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      user_id, title, description,
+      JSON.stringify(technologies || []),
+      image_url, github_url, demo_url, featured
+    ]);
+    res.status(201).json({ success: true, message: "Projet ajouté avec succès", project: result.rows[0] });
+  } catch (error) {
+    console.error('Erreur création projet:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/users/:id/projects
+app.get('/api/users/:id/projects', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const result = await pool.query(`
+      SELECT * FROM projects WHERE user_id = $1 ORDER BY created_at DESC
+    `, [userId]);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Erreur récupération projets' });
+  }
+});
+
+// POST /api/skills
+app.post('/api/skills', async (req, res) => {
+  try {
+    const { user_id, category, items, icon_name, display_order = 0 } = req.body;
+    if (!user_id || !category || !items) {
+      return res.status(400).json({ success: false, message: "user_id, category et items sont requis" });
+    }
+    const result = await pool.query(`
+      INSERT INTO skills (user_id, category, items, icon_name, display_order)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [
+      user_id,
+      category,
+      JSON.stringify(items),
+      icon_name || null,
+      display_order
+    ]);
+    res.status(201).json({ success: true, message: "Compétence ajoutée", skill: result.rows[0] });
+  } catch (error) {
+    console.error('Erreur ajout skill:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/users/:id/skills
+app.get('/api/users/:id/skills', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const result = await pool.query(`
+      SELECT * FROM skills WHERE user_id = $1 ORDER BY display_order, category
+    `, [userId]);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Erreur récupération compétences' });
+  }
+});
+
+
+// juste après les routes existantes, avant le 404 API
+
+// 1) Lister tous les users actifs
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id, name, email, title, description, experience_years, location,
+        phone, github_url, linkedin_url, personal_website,
+        avatar_url, hero_background, theme_color, custom_slug
+      FROM users
+      WHERE is_active = true
+      ORDER BY created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Erreur /users:', err);
+    res.status(500).json({ success: false, message: 'Erreur récupération users' });
+  }
+});
+
+// 2) Récupérer un user + ses projects & skills
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const u = await pool.query(
+      `SELECT * FROM users WHERE id = $1 AND is_active = true`,
+      [userId]
+    );
+    if (u.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User non trouvé' });
+    }
+    const user = u.rows[0];
+
+    const p = await pool.query(`
+      SELECT id, title, description, technologies, image_url,
+             github_url, demo_url, featured, view_count
+      FROM projects
+      WHERE user_id = $1 AND is_active = true
+      ORDER BY created_at DESC
+    `, [userId]);
+
+    const s = await pool.query(`
+      SELECT id, category, items, icon_name, display_order
+      FROM skills
+      WHERE user_id = $1 AND is_active = true
+      ORDER BY display_order, category
+    `, [userId]);
+
+    const projects = p.rows.map(pr => ({
+      ...pr,
+      technologies: pr.technologies || []
+    }));
+    const skills = s.rows.map(sk => ({
+      ...sk,
+      items: sk.items || []
+    }));
+
+    res.json({ user, projects, skills });
+  } catch (err) {
+    console.error(`Erreur /api/users/${req.params.id}:`, err);
+    res.status(500).json({ success: false, message: 'Erreur récupération user' });
+  }
+});
+
+// Route pour créer un nouvel utilisateur (portfolio)
+app.post('/api/users', async (req, res) => {
+  try {
+    // 1) Récupérer les champs depuis le corps de la requête
+    const {
+      name,
+      email,
+      title = null,
+      description = null,
+      experience_years = 0,
+      location = null,
+      phone = null,
+      github_url = null,
+      linkedin_url = null,
+      personal_website = null,
+      avatar_url = null,
+      hero_background = null,
+      theme_color = null,
+      custom_slug = null,
+      is_active = true
+    } = req.body;
+
+    // 2) Validation minimale
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Les champs name et email sont obligatoires'
+      });
+    }
+
+    // 3) Insertion en base avec RETURNING *
+    const result = await pool.query(
+      `INSERT INTO users
+        (name, email, title, description, experience_years, location, phone,
+         github_url, linkedin_url, personal_website, avatar_url, hero_background,
+         theme_color, custom_slug, is_active)
+       VALUES
+        ($1, $2, $3, $4, $5, $6, $7,
+         $8, $9, $10, $11, $12,
+         $13, $14, $15)
+       RETURNING *`,
+      [
+        name,
+        email,
+        title,
+        description,
+        experience_years,
+        location,
+        phone,
+        github_url,
+        linkedin_url,
+        personal_website,
+        avatar_url,
+        hero_background,
+        theme_color,
+        custom_slug,
+        is_active
+      ]
+    );
+
+    // 4) Renvoi de l’utilisateur créé
+    const newUser = result.rows[0];
+    res.status(201).json({
+      success: true,
+      message: 'Utilisateur créé avec succès',
+      user: newUser
+    });
+  } catch (error) {
+    console.error('Erreur création user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la création de l’utilisateur'
+    });
+  }
+});
+
+
 // Route 404 pour API
 app.use('/api/*', (req, res) => {
   res.status(404).json({ 
