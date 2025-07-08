@@ -14,12 +14,12 @@ const ProjectCard = React.memo(({ project, isSelected, onSelect, onDelete }) => 
     <div
       onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}
       tabIndex={0}
-      className={`bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer relative
+      className={`group bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer relative
         ${isSelected ? "border-yellow-400" : "border-transparent"}`}
     >
       <button
         type="button"
-        className="absolute top-2 right-2 bg-blue-700 hover:bg-blue-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow"
+        className="absolute top-2 right-2 bg-blue-700 hover:bg-blue-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
         title="Supprimer ce projet"
         onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
         tabIndex={-1}
@@ -542,7 +542,7 @@ const clearSelections = () => {
   // Update active section on scroll
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['hero', 'about', 'skills', 'projects', 'contact'];
+      const sections = ['hero', 'about', 'skills','experiences', 'projects', 'contact'];
       const scrollPosition = window.scrollY + 100;
 
       for (const section of sections) {
@@ -565,15 +565,15 @@ const clearSelections = () => {
 
 
   // Icone pour chaque catégorie
-  const getIconComponent = (iconName) => {
-    const icons = {
-      'Code': Code,
-      'Server': Server,
-      'Smartphone': Smartphone,
-      'Palette': Palette
-    };
-    return icons[iconName] || Code;
-  };
+  // const getIconComponent = (iconName) => {
+  //   const icons = {
+  //     'Code': Code,
+  //     'Server': Server,
+  //     'Smartphone': Smartphone,
+  //     'Palette': Palette
+  //   };
+  //   return icons[iconName] || Code;
+  // };
 
 
 
@@ -808,7 +808,7 @@ const techOptions = referenceSkills
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-800">
-              {['hero', 'about', 'skills', 'projects', 'contact'].map((section) => (
+              {['hero', 'about', 'skills', 'experiences','projects', 'contact'].map((section) => (
                 <button
                   key={section}
                   onClick={() => scrollToSection(section)}
