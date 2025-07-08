@@ -5,21 +5,37 @@ import { useEffect, useState } from 'react';
 import Portfolio from './Portfolio';
 import NotFound from './NotFound';
 
+// 🚀 CACHE SIMPLE - AJOUT
+const portfolioCache = new Map();
+
 const PortfolioPage = () => {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fonction pour charger toutes les données (MODIFIÉE pour inclure experiences)
+  // 🚀 FONCTION LOADDATA OPTIMISÉE
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Vérifier le cache d'abord
+      if (portfolioCache.has(id)) {
+        console.log('💾 Chargé depuis le cache !');
+        setData(portfolioCache.get(id));
+        setLoading(false);
+        return;
+      }
+      
+      // Sinon charger depuis le serveur
+      console.log('🌐 Chargement depuis le serveur...');
       const response = await fetch(`/api/users/${id}`);
       const result = await response.json();
       
       if (result.success === false) {
         setData(null);
       } else {
+        // Sauvegarder en cache
+        portfolioCache.set(id, result);
         setData(result);
       }
     } catch (error) {
@@ -53,21 +69,23 @@ const PortfolioPage = () => {
       const result = await response.json();
       
       if (result.user) {
-        setData(prevData => ({
-          ...prevData,
+        const newData = {
+          ...data,
           user: result.user
-        }));
+        };
+        setData(newData);
+        // Mettre à jour le cache aussi
+        portfolioCache.set(id, newData);
       }
 
       return { success: true };
     } catch (error) {
       console.error('Erreur:', error);
-      await loadData(); // Recharge en cas d'erreur
+      await loadData();
       return { success: false };
     }
   };
 
-  // Fonction pour mettre à jour les projets
   const updateProjects = (updatedProjects) => {
     setData(prevData => ({
       ...prevData,
@@ -75,7 +93,6 @@ const PortfolioPage = () => {
     }));
   };
 
-  // Fonction pour mettre à jour les compétences
   const updateSkills = (updatedSkills) => {
     setData(prevData => ({
       ...prevData,
@@ -83,7 +100,6 @@ const PortfolioPage = () => {
     }));
   };
 
-  // NOUVELLE FONCTION pour mettre à jour les expériences
   const updateExperiences = (updatedExperiences) => {
     setData(prevData => ({
       ...prevData,
@@ -105,11 +121,11 @@ const PortfolioPage = () => {
       user={data.user} 
       projects={data.projects} 
       skills={data.skills}
-      experiences={data.experiences || []} // AJOUT avec fallback
+      experiences={data.experiences || []}
       updateUser={updateUser}
       updateProjects={updateProjects}
       updateSkills={updateSkills}
-      updateExperiences={updateExperiences} // NOUVEAU
+      updateExperiences={updateExperiences}
       loadData={loadData}
     />
   );

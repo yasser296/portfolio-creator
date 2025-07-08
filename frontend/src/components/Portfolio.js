@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil } from 'lucide-react';  
 import CreatableSelect from 'react-select/creatable';
@@ -8,6 +8,182 @@ import CreatableSelect from 'react-select/creatable';
 import {
   ChevronDown, Mail, Phone, MapPin, Github, Linkedin, ExternalLink, Code, Palette, Server, Smartphone
 } from 'lucide-react';
+
+const ProjectCard = React.memo(({ project, isSelected, onSelect, onDelete }) => {
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}
+      tabIndex={0}
+      className={`bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer relative
+        ${isSelected ? "border-yellow-400" : "border-transparent"}`}
+    >
+      <button
+        type="button"
+        className="absolute top-2 right-2 bg-blue-700 hover:bg-blue-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow"
+        title="Supprimer ce projet"
+        onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
+        tabIndex={-1}
+      >
+        ×
+      </button>
+
+      <img
+        src={
+          project.image_url?.startsWith('/')
+            ? `${process.env.PUBLIC_URL}${project.image_url}`
+            : project.image_url
+        }
+        alt={project.title}
+        className="w-full h-48 object-cover"
+        onError={e => { e.target.src = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=250&fit=crop'; }}
+      />
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xl font-semibold">{project.title}</h3>
+          {project.featured && (
+            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">
+              ⭐ Featured
+            </span>
+          )}
+        </div>
+        <p className="text-gray-300 mb-4 text-sm">{project.description}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {Array.isArray(project.technologies) && project.technologies.map((tech, techIndex) => (
+            <span key={techIndex} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs">
+              {tech}
+            </span>
+          ))}
+        </div>
+        <div className="flex space-x-4 items-center">
+          {project.github_url && (
+            <a
+              href={project.github_url}
+              className="flex items-center text-gray-400 hover:text-white transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Github className="w-4 h-4 mr-1" />
+              Code
+            </a>
+          )}
+          {project.demo_url && (
+            <a
+              href={project.demo_url}
+              className="flex items-center text-gray-400 hover:text-white transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              Demo
+            </a>
+          )}
+          {project.view_count > 0 && (
+            <span className="text-gray-500 text-xs">
+              👁️ {project.view_count}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// 🚀 COMPOSANT SKILL OPTIMISÉ
+const SkillCard = React.memo(({ skill, isSelected, onSelect, onDelete }) => {
+  const IconComponent = useMemo(() => {
+    const icons = {
+      'Code': Code,
+      'Server': Server,
+      'Smartphone': Smartphone,
+      'Palette': Palette
+    };
+    return icons[skill.icon_name] || Code;
+  }, [skill.icon_name]);
+
+  const items = useMemo(() => 
+    Array.isArray(skill.items) ? skill.items : [], 
+    [skill.items]
+  );
+
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onSelect(skill.id); }}
+      tabIndex={0}
+      className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-colors border-2 cursor-pointer group
+        ${isSelected ? "border-yellow-400" : "border-transparent"}`}
+    >
+      <button
+        type="button"
+        className="absolute top-2 right-2 bg-purple-700 hover:bg-purple-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
+        title="Supprimer cette compétence"
+        onClick={(e) => { e.stopPropagation(); onDelete(skill.id); }}
+        tabIndex={-1}
+      >
+        ×
+      </button>
+
+      <div className="flex items-center mb-4">
+        <IconComponent className="w-8 h-8 text-blue-400 mr-3" />
+        <h3 className="text-xl font-semibold">{skill.category}</h3>
+      </div>
+      <ul className="space-y-2">
+        {items.map((item, itemIndex) => (
+          <li key={itemIndex} className="text-gray-300 text-sm">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+});
+
+// 🚀 COMPOSANT EXPERIENCE OPTIMISÉ
+const ExperienceCard = React.memo(({ experience, isSelected, onSelect, onDelete, formatDate, formatDuration }) => {
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onSelect(experience.id); }}
+      tabIndex={0}
+      className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-all duration-300 border-2 cursor-pointer group
+        ${isSelected ? "border-yellow-400" : "border-transparent"}`}
+    >
+      <button
+        type="button"
+        className="absolute top-2 right-2 bg-green-700 hover:bg-green-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
+        title="Supprimer cette expérience"
+        onClick={(e) => { e.stopPropagation(); onDelete(experience.id); }}
+        tabIndex={-1}
+      >
+        ×
+      </button>
+
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs">🏢</span>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-100">{experience.entreprise}</h3>
+          </div>
+          <h4 className="text-lg font-medium text-green-400 mb-3">{experience.poste}</h4>
+          
+          <div className="flex items-center gap-2 text-gray-400 mb-3">
+            <span className="text-sm">📅</span>
+            <span className="text-sm">
+              {formatDate(experience.dateDebut)} - {experience.dateFin ? formatDate(experience.dateFin) : 'Présent'}
+            </span>
+            <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
+              {formatDuration(experience.dateDebut, experience.dateFin)}
+            </span>
+          </div>
+          
+          {experience.description && (
+            <p className="text-gray-300 leading-relaxed">{experience.description}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const Portfolio = ({ user, projects, skills, experiences, updateUser, loadData}) => {
   // Formulaire contact (local)
@@ -75,28 +251,53 @@ const [experienceForm, setExperienceForm] = useState({
 });
 const [selectedExperienceId, setSelectedExperienceId] = useState(null);
 
-const formatDuration = (dateDebut, dateFin) => {
-  const debut = new Date(dateDebut);
-  const fin = dateFin ? new Date(dateFin) : new Date();
-  
-  const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
-  const moisFin = fin.getFullYear() * 12 + fin.getMonth();
-  const totalMois = moisFin - moisDebut + 1;
-  
-  const annees = Math.floor(totalMois / 12);
-  const mois = totalMois % 12;
-  
-  let duree = '';
-  if (annees > 0) duree += `${annees} an${annees > 1 ? 's' : ''}`;
-  if (mois > 0) duree += `${duree ? ' ' : ''}${mois} mois`;
-  
-  return duree || '1 mois';
-};
+const handleProjectSelect = useCallback((projectId) => {
+    setSelectedProjectId(projectId);
+  }, []);
 
-const formatDate = (date) => {
-  const d = new Date(date);
-  return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
-};
+  const handleProjectDelete = useCallback((projectId) => {
+    openDeleteModal("project", projectId);
+  }, []);
+
+  const handleSkillSelect = useCallback((skillId) => {
+    setSelectedSkillId(skillId);
+  }, []);
+
+  const handleSkillDelete = useCallback((skillId) => {
+    openDeleteModal("skill", skillId);
+  }, []);
+
+  const handleExperienceSelect = useCallback((experienceId) => {
+    setSelectedExperienceId(experienceId);
+  }, []);
+
+  const handleExperienceDelete = useCallback((experienceId) => {
+    openDeleteModal("experience", experienceId);
+  }, []);
+
+  // 🚀 FONCTIONS DE FORMATAGE OPTIMISÉES
+  const formatDate = useCallback((date) => {
+    const d = new Date(date);
+    return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
+  }, []);
+
+  const formatDuration = useCallback((dateDebut, dateFin) => {
+    const debut = new Date(dateDebut);
+    const fin = dateFin ? new Date(dateFin) : new Date();
+    
+    const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
+    const moisFin = fin.getFullYear() * 12 + fin.getMonth();
+    const totalMois = moisFin - moisDebut + 1;
+    
+    const annees = Math.floor(totalMois / 12);
+    const mois = totalMois % 12;
+    
+    let duree = '';
+    if (annees > 0) duree += `${annees} an${annees > 1 ? 's' : ''}`;
+    if (mois > 0) duree += `${duree ? ' ' : ''}${mois} mois`;
+    
+    return duree || '1 mois';
+  }, []);
 
 // ==================== GESTION CRUD EXPÉRIENCES ====================
 async function handleExperienceSubmit(e) {
@@ -231,7 +432,7 @@ const clearSelections = () => {
   setSelectedSkillId(null);
   setSelectedProjectId(null);
   setSelectedExperienceId(null);
-};  
+}; 
 
   //   // Fonction loadData améliorée pour les projets et compétences
   // const loadProjectsAndSkills = async () => {
@@ -971,42 +1172,15 @@ const techOptions = referenceSkills
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {skills && skills.length > 0 ? (
-              skills.map(skill => {
-                const IconComponent = getIconComponent(skill.icon_name);
-                const items = Array.isArray(skill.items) ? skill.items : [];
-                return (
-                  <div
-                    key={skill.id}
-                    onClick={e => { e.stopPropagation(); setSelectedSkillId(skill.id); }}
-                    tabIndex={0}
-                    className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-colors border-2 cursor-pointer group
-                      ${selectedSkillId === skill.id ? "border-yellow-400" : "border-transparent"}`}
-                  >
-                    {/* Bouton X de suppression */}
-                      <button
-                        type="button"
-                        className="absolute top-2 right-2 bg-purple-700 hover:bg-purple-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
-                        title="Supprimer cette compétence"
-                        onClick={e => { e.stopPropagation(); openDeleteModal("skill", skill.id); }}
-                        tabIndex={-1}
-                      >
-                        ×
-                      </button>
-
-                    <div className="flex items-center mb-4">
-                      <IconComponent className="w-8 h-8 text-blue-400 mr-3" />
-                      <h3 className="text-xl font-semibold">{skill.category}</h3>
-                    </div>
-                    <ul className="space-y-2">
-                      {items.map((item, itemIndex) => (
-                        <li key={itemIndex} className="text-gray-300 text-sm">
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })
+              skills.map(skill => (
+                <SkillCard
+                  key={skill.id}
+                  skill={skill}
+                  isSelected={selectedSkillId === skill.id}
+                  onSelect={handleSkillSelect}
+                  onDelete={handleSkillDelete}
+                />
+              ))
             ) : (
               <div className="col-span-full text-center py-12">
                 <p className="text-gray-400 text-lg">Aucune compétence à afficher.</p>
@@ -1192,53 +1366,18 @@ const techOptions = referenceSkills
           {experiences && experiences.length > 0 ? (
             <div className="space-y-6">
               {experiences
-                .sort((a, b) => new Date(b.dateDebut) - new Date(a.dateDebut)) // Tri par date décroissante
+                .sort((a, b) => new Date(b.dateDebut) - new Date(a.dateDebut))
                 .map(experience => (
-                <div
-                  key={experience.id}
-                  onClick={e => { e.stopPropagation(); setSelectedExperienceId(experience.id); }}
-                  tabIndex={0}
-                  className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-all duration-300 border-2 cursor-pointer group
-                    ${selectedExperienceId === experience.id ? "border-yellow-400" : "border-transparent"}`}
-                >
-                  {/* Bouton X de suppression */}
-                  <button
-                    type="button"
-                    className="absolute top-2 right-2 bg-green-700 hover:bg-green-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
-                    title="Supprimer cette expérience"
-                    onClick={e => { e.stopPropagation(); openDeleteModal("experience", experience.id); }}
-                    tabIndex={-1}
-                  >
-                    ×
-                  </button>
-
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs">🏢</span>
-                        </div>
-                        <h3 className="text-xl font-semibold text-gray-100">{experience.entreprise}</h3>
-                      </div>
-                      <h4 className="text-lg font-medium text-green-400 mb-3">{experience.poste}</h4>
-                      
-                      <div className="flex items-center gap-2 text-gray-400 mb-3">
-                        <span className="text-sm">📅</span>
-                        <span className="text-sm">
-                          {formatDate(experience.dateDebut)} - {experience.dateFin ? formatDate(experience.dateFin) : 'Présent'}
-                        </span>
-                        <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                          {formatDuration(experience.dateDebut, experience.dateFin)}
-                        </span>
-                      </div>
-                      
-                      {experience.description && (
-                        <p className="text-gray-300 leading-relaxed">{experience.description}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  <ExperienceCard
+                    key={experience.id}
+                    experience={experience}
+                    isSelected={selectedExperienceId === experience.id}
+                    onSelect={handleExperienceSelect}
+                    onDelete={handleExperienceDelete}
+                    formatDate={formatDate}
+                    formatDuration={formatDuration}
+                  />
+                ))}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -1299,53 +1438,53 @@ const techOptions = referenceSkills
             </h3>
             {formError && <div className="text-red-400 mb-2">{formError}</div>}
             <CreatableSelect
-  isMulti
-  options={techOptions}
-  value={
-    projectForm.technologies
-      ? projectForm.technologies.split(",").map(s => ({
-          value: s.trim(),
-          label: s.trim()
-        }))
-      : []
-  }
-  onChange={selected =>
-    setProjectForm(f => ({
-      ...f,
-      technologies: selected.map(o => o.value).join(", ")
-    }))
-  }
-  placeholder="Choisissez ou ajoutez les technologies utilisées"
-  className="mb-4"
-  styles={{
-    control: base => ({
-      ...base,
-      backgroundColor: '#23243a',
-      color: 'white',
-      borderColor: '#38bdf8'
-    }),
-    input: base => ({
-      ...base,
-      color: 'white'
-    }),
-    menu: base => ({
-      ...base,
-      backgroundColor: '#2d2f42',
-      color: 'white'
-    }),
-    multiValue: base => ({
-      ...base,
-      backgroundColor: '#38bdf8',
-      color: 'white'
-    }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isFocused ? "#38bdf8" : "#23243a",
-      color: 'white'
-    }),
-  }}
-  maxMenuHeight={180}
-/>
+              isMulti
+              options={techOptions}
+              value={
+                projectForm.technologies
+                  ? projectForm.technologies.split(",").map(s => ({
+                      value: s.trim(),
+                      label: s.trim()
+                    }))
+                  : []
+              }
+              onChange={selected =>
+                setProjectForm(f => ({
+                  ...f,
+                  technologies: selected.map(o => o.value).join(", ")
+                }))
+              }
+              placeholder="Choisissez ou ajoutez les technologies utilisées"
+              className="mb-4"
+              styles={{
+                control: base => ({
+                  ...base,
+                  backgroundColor: '#23243a',
+                  color: 'white',
+                  borderColor: '#38bdf8'
+                }),
+                input: base => ({
+                  ...base,
+                  color: 'white'
+                }),
+                menu: base => ({
+                  ...base,
+                  backgroundColor: '#2d2f42',
+                  color: 'white'
+                }),
+                multiValue: base => ({
+                  ...base,
+                  backgroundColor: '#38bdf8',
+                  color: 'white'
+                }),
+                option: (base, state) => ({
+                  ...base,
+                  backgroundColor: state.isFocused ? "#38bdf8" : "#23243a",
+                  color: 'white'
+                }),
+              }}
+              maxMenuHeight={180}
+            />
 
             <textarea
               className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
@@ -1424,82 +1563,13 @@ const techOptions = referenceSkills
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {projects && projects.length > 0 ? (
               projects.map(project => (
-                <div
+                <ProjectCard
                   key={project.id}
-                  onClick={e => { e.stopPropagation(); setSelectedProjectId(project.id); }}
-                  tabIndex={0}
-                  className={`bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer
-                    ${selectedProjectId === project.id ? "border-yellow-400" : "border-transparent"}`}
-                >
-                  {/* Bouton X de suppression */}
-                    <button
-                      type="button"
-                      className="absolute top-2 right-2 bg-blue-700 hover:bg-blue-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow"
-                      title="Supprimer ce projet"
-                      onClick={e => { e.stopPropagation(); openDeleteModal("project", project.id); }}
-                      tabIndex={-1}
-                    >
-                      ×
-                    </button>
-
-                  <img
-                    src={
-                      project.image_url?.startsWith('/')
-                        ? `${process.env.PUBLIC_URL}${project.image_url}`
-                        : project.image_url
-                    }
-                    alt={project.title}
-                    className="w-full h-48 object-cover"
-                    onError={e => { e.target.src = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=250&fit=crop'; }}
-                  />
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xl font-semibold">{project.title}</h3>
-                      {project.featured && (
-                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">
-                          ⭐ Featured
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-300 mb-4 text-sm">{project.description}</p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {Array.isArray(project.technologies) && project.technologies.map((tech, techIndex) => (
-                        <span key={techIndex} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs">
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex space-x-4 items-center">
-                      {project.github_url && (
-                        <a
-                          href={project.github_url}
-                          className="flex items-center text-gray-400 hover:text-white transition-colors"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Github className="w-4 h-4 mr-1" />
-                          Code
-                        </a>
-                      )}
-                      {project.demo_url && (
-                        <a
-                          href={project.demo_url}
-                          className="flex items-center text-gray-400 hover:text-white transition-colors"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          Demo
-                        </a>
-                      )}
-                      {project.view_count > 0 && (
-                        <span className="text-gray-500 text-xs">
-                          👁️ {project.view_count}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  project={project}
+                  isSelected={selectedProjectId === project.id}
+                  onSelect={handleProjectSelect}
+                  onDelete={handleProjectDelete}
+                />
               ))
             ) : (
               <div className="col-span-full text-center py-12">
