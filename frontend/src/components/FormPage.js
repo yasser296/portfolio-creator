@@ -51,6 +51,8 @@ const FormPage = () => {
     label: s.skill_name
   }));
 
+  
+
 
   useEffect(() => {
     fetch('/api/users')
@@ -77,9 +79,9 @@ const FormPage = () => {
   };
 
   // Fonctions utilitaires pour l'affichage
-  const formatDuration = (dateDebut, dateFin) => {
-    const debut = new Date(dateDebut);
-    const fin = dateFin ? new Date(dateFin) : new Date();
+  const formatDuration = (date_debut, date_fin) => {
+    const debut = new Date(date_debut);
+    const fin = date_fin ? new Date(date_fin) : new Date();
     
     const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
     const moisFin = fin.getFullYear() * 12 + fin.getMonth();
@@ -443,7 +445,7 @@ const FormPage = () => {
               <ul className="ml-4 space-y-2">
                 {experiences.length === 0 && <li className="text-gray-400 text-sm">Aucune expérience.</li>}
                 {experiences
-                  .sort((a, b) => new Date(b.dateDebut) - new Date(a.dateDebut))
+                  .sort((a, b) => new Date(b.date_debut) - new Date(a.date_debut))
                   .map((exp, idx) => (
                   <li key={idx} className="bg-gray-800/50 p-3 rounded border-l-2 border-green-400">
                     <div className="flex items-start justify-between">
@@ -451,13 +453,13 @@ const FormPage = () => {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-green-300">{exp.entreprise}</span>
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                            {formatDuration(exp.dateDebut, exp.dateFin)}
+                            {formatDuration(exp.date_debut, exp.date_fin)}
                           </span>
                         </div>
                         <div className="text-white/90 text-sm">{exp.poste}</div>
                         <div className="text-gray-400 text-xs">
-                          {new Date(exp.dateDebut).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} - 
-                          {exp.dateFin ? new Date(exp.dateFin).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : 'Présent'}
+                          {new Date(exp.date_debut).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} - 
+                          {exp.date_fin ? new Date(exp.date_fin).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : 'Présent'}
                         </div>
                         {exp.description && (
                           <div className="text-gray-300 text-xs mt-1 italic">{exp.description}</div>
@@ -886,25 +888,40 @@ function SkillFormModal({ onClose, onSave, initialData, skillsReference = [] }) 
   );
 }
 
-function ExperienceFormModal({ onClose, onSave, initialData }) {
+function ExperienceFormModal({ onClose, onSave, initialData  }) {
   const [form, setForm] = useState(
     initialData || { 
       entreprise: '', 
       poste: '', 
-      dateDebut: '', 
-      dateFin: '', 
+      date_debut: '',  // ✅ Utiliser date_debut
+      date_fin: '',    // ✅ Utiliser date_fin
       description: '' 
     }
   );
 
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    // "2025-03-01" → "2025-03"
+    return dateString.substring(0, 7);
+  };
+
   useEffect(() => {
-    if (initialData) setForm(initialData);
+    if (initialData) {
+      // ✅ CORRIGER pour s'assurer que les valeurs sont définies
+      setForm({
+        entreprise: initialData.entreprise || '',
+        poste: initialData.poste || '',
+        date_debut: formatDateForInput(initialData.date_debut) || '',
+        date_fin: formatDateForInput(initialData.date_fin) || '',
+        description: initialData.description || ''
+      });
+    }
   }, [initialData]);
 
-  const formatDurationPreview = (dateDebut, dateFin) => {
-    if (!dateDebut) return '';
-    const debut = new Date(dateDebut);
-    const fin = dateFin ? new Date(dateFin) : new Date();
+  const formatDurationPreview = (date_debut, date_fin) => {
+    if (!date_debut) return '';
+    const debut = new Date(date_debut);
+    const fin = date_fin ? new Date(date_fin) : new Date();
     
     const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
     const moisFin = fin.getFullYear() * 12 + fin.getMonth();
@@ -926,7 +943,7 @@ function ExperienceFormModal({ onClose, onSave, initialData }) {
         className="bg-gray-900 p-6 rounded-xl shadow-lg w-full max-w-md flex flex-col gap-3"
         onSubmit={e => {
           e.preventDefault();
-          if (!form.entreprise.trim() || !form.poste.trim() || !form.dateDebut) {
+          if (!form.entreprise.trim() || !form.poste.trim() || !form.date_debut) {
             alert('Entreprise, poste et date de début sont obligatoires');
             return;
           }
@@ -974,8 +991,8 @@ function ExperienceFormModal({ onClose, onSave, initialData }) {
             <input
               type="month"
               className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
-              value={form.dateDebut}
-              onChange={e => setForm(f => ({ ...f, dateDebut: e.target.value }))}
+              value={form.date_debut}
+              onChange={e => setForm(f => ({ ...f, date_debut: e.target.value }))}
               required
             />
           </div>
@@ -987,18 +1004,18 @@ function ExperienceFormModal({ onClose, onSave, initialData }) {
             <input
               type="month"
               className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
-              value={form.dateFin}
-              onChange={e => setForm(f => ({ ...f, dateFin: e.target.value }))}
+              value={form.date_fin}
+              onChange={e => setForm(f => ({ ...f, date_fin: e.target.value }))}
             />
             <p className="text-xs text-gray-500 mt-1">Laissez vide si c'est votre poste actuel</p>
           </div>
         </div>
 
         {/* Aperçu de la durée */}
-        {form.dateDebut && (
+        {form.date_debut && (
           <div className="text-center">
             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              Durée : {formatDurationPreview(form.dateDebut, form.dateFin)}
+              Durée : {formatDurationPreview(form.date_debut, form.date_fin)}
             </span>
           </div>
         )}

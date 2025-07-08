@@ -915,21 +915,25 @@ app.post('/api/users', async (req, res) => {
 // POST /api/experiences - Créer une nouvelle expérience
 app.post('/api/experiences', async (req, res) => {
   try {
-    const { user_id, entreprise, poste, dateDebut, dateFin, description } = req.body;
+    const { user_id, entreprise, poste, date_debut, date_fin, description } = req.body;
     
     // Validation
-    if (!user_id || !entreprise || !poste || !dateDebut) {
+    if (!user_id || !entreprise || !poste || !date_debut) {
       return res.status(400).json({ 
         success: false, 
-        message: 'user_id, entreprise, poste et dateDebut sont obligatoires' 
+        message: 'user_id, entreprise, poste et date_debut sont obligatoires' 
       });
     }
+    
+    // ✅ CONVERSION DES DATES : Ajouter "-01" pour les rendre compatibles PostgreSQL
+    const dateDebutFormatted = date_debut + '-01'; // "2025-03" → "2025-03-01"
+    const dateFinFormatted = date_fin ? date_fin + '-01' : null; // "2025-04" → "2025-04-01" ou null
     
     const result = await pool.query(
       `INSERT INTO experiences (user_id, entreprise, poste, date_debut, date_fin, description) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
-      [user_id, entreprise, poste, dateDebut, dateFin || null, description || '']
+      [user_id, entreprise, poste, dateDebutFormatted, dateFinFormatted, description || '']
     );
     
     res.status(201).json({
@@ -947,15 +951,19 @@ app.post('/api/experiences', async (req, res) => {
 app.put('/api/experiences/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { entreprise, poste, dateDebut, dateFin, description } = req.body;
+    const { entreprise, poste, date_debut, date_fin, description } = req.body;
     
     // Validation
-    if (!entreprise || !poste || !dateDebut) {
+    if (!entreprise || !poste || !date_debut) {
       return res.status(400).json({ 
         success: false, 
-        message: 'entreprise, poste et dateDebut sont obligatoires' 
+        message: 'entreprise, poste et date_debut sont obligatoires' 
       });
     }
+    
+    // ✅ CONVERSION DES DATES : Ajouter "-01" pour les rendre compatibles PostgreSQL
+    const dateDebutFormatted = date_debut + '-01'; // "2025-03" → "2025-03-01"
+    const dateFinFormatted = date_fin ? date_fin + '-01' : null; // "2025-04" → "2025-04-01" ou null
     
     const result = await pool.query(
       `UPDATE experiences 
@@ -963,7 +971,7 @@ app.put('/api/experiences/:id', async (req, res) => {
            description = $5, updated_at = CURRENT_TIMESTAMP
        WHERE id = $6 
        RETURNING *`,
-      [entreprise, poste, dateDebut, dateFin || null, description || '', id]
+      [entreprise, poste, dateDebutFormatted, dateFinFormatted, description || '', id]
     );
     
     if (result.rows.length === 0) {

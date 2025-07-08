@@ -275,6 +275,12 @@ const handleProjectSelect = useCallback((projectId) => {
     openDeleteModal("experience", experienceId);
   }, []);
 
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    // "2025-03-01" → "2025-03"
+    return dateString.substring(0, 7);
+  };
+
   // 🚀 FONCTIONS DE FORMATAGE OPTIMISÉES
   const formatDate = useCallback((date) => {
     const d = new Date(date);
@@ -1272,7 +1278,7 @@ const techOptions = referenceSkills
             onClick={e => { 
               e.stopPropagation(); 
               setShowExperienceForm(true); 
-              setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "", id: null });
+              setExperienceForm({ entreprise: "", poste: "", date_debut: "", date_fin: "", description: "", id: null });
               setFormError("");
             }}
             className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold shadow"
@@ -1287,6 +1293,8 @@ const techOptions = referenceSkills
               if (exp) {
                 setExperienceForm({
                   ...exp,
+                  date_debut: formatDateForInput(exp.date_debut),
+                  date_fin: formatDateForInput(exp.date_fin),
                   id: exp.id
                 });
                 setShowExperienceForm(true);
@@ -1393,7 +1401,7 @@ const techOptions = referenceSkills
                 className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
                 onClick={() => { 
                   setShowExperienceForm(false); 
-                  setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "", id: null }); 
+                  setExperienceForm({ entreprise: "", poste: "", date_debut: "", date_fin: "", description: "", id: null }); 
                   setEditingExperience(null); 
                 }}
               >
