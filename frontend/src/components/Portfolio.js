@@ -169,10 +169,10 @@ const ExperienceCard = React.memo(({ experience, isSelected, onSelect, onDelete,
           <div className="flex items-center gap-2 text-gray-400 mb-3">
             <span className="text-sm">📅</span>
             <span className="text-sm">
-              {formatDate(experience.dateDebut)} - {experience.dateFin ? formatDate(experience.dateFin) : 'Présent'}
+              {formatDate(experience.date_debut)} - {experience.date_fin ? formatDate(experience.date_fin) : 'Présent'}
             </span>
             <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              {formatDuration(experience.dateDebut, experience.dateFin)}
+              {formatDuration(experience.date_debut, experience.date_fin)}
             </span>
           </div>
           
@@ -245,8 +245,8 @@ const [editingExperience, setEditingExperience] = useState(null);
 const [experienceForm, setExperienceForm] = useState({
   entreprise: "",
   poste: "",
-  dateDebut: "",
-  dateFin: "",
+  date_debut: "",    // Changé de dateDebut
+  date_fin: "",      // Changé de dateFin
   description: "",
 });
 const [selectedExperienceId, setSelectedExperienceId] = useState(null);
@@ -279,11 +279,11 @@ const handleProjectSelect = useCallback((projectId) => {
   const formatDate = useCallback((date) => {
     const d = new Date(date);
     return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
-  }, []);
+    }, []);
 
-  const formatDuration = useCallback((dateDebut, dateFin) => {
-    const debut = new Date(dateDebut);
-    const fin = dateFin ? new Date(dateFin) : new Date();
+  const formatDuration = useCallback((date_debut, date_fin) => {
+    const debut = new Date(date_debut);
+    const fin = date_fin ? new Date(date_fin) : new Date();
     
     const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
     const moisFin = fin.getFullYear() * 12 + fin.getMonth();
@@ -304,7 +304,7 @@ async function handleExperienceSubmit(e) {
   e.preventDefault();
   setFormError("");
   
-  if (!experienceForm.entreprise || !experienceForm.poste || !experienceForm.dateDebut) {
+  if (!experienceForm.entreprise || !experienceForm.poste || !experienceForm.date_debut) {
     setFormError("Entreprise, poste et date de début obligatoires.");
     return;
   }
@@ -337,7 +337,7 @@ async function handleExperienceSubmit(e) {
     setShowExperienceForm(false);
     setEditingExperience(null);
     setSelectedExperienceId(null);
-    setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "" });
+    setExperienceForm({ entreprise: "", poste: "", date_debut: "", date_fin: "", description: "" });
   } catch (err) {
     setFormError("Erreur : " + err.message);
   }
@@ -1348,8 +1348,8 @@ const techOptions = referenceSkills
                 <input
                   type="month"
                   className="px-3 py-2 rounded bg-gray-800 text-white w-full"
-                  value={experienceForm.dateDebut}
-                  onChange={e => setExperienceForm(f => ({ ...f, dateDebut: e.target.value }))}
+                  value={experienceForm.date_debut}
+                  onChange={e => setExperienceForm(f => ({ ...f, date_debut: e.target.value }))}
                   required
                 />
               </div>
@@ -1361,8 +1361,8 @@ const techOptions = referenceSkills
                 <input
                   type="month"
                   className="px-3 py-2 rounded bg-gray-800 text-white w-full"
-                  value={experienceForm.dateFin}
-                  onChange={e => setExperienceForm(f => ({ ...f, dateFin: e.target.value }))}
+                  value={experienceForm.date_fin}
+                  onChange={e => setExperienceForm(f => ({ ...f, date_fin: e.target.value }))}
                 />
                 <p className="text-xs text-gray-500 mt-1">Laissez vide si c'est votre poste actuel</p>
               </div>
@@ -1411,7 +1411,7 @@ const techOptions = referenceSkills
           {experiences && experiences.length > 0 ? (
             <div className="space-y-6">
               {experiences
-                .sort((a, b) => new Date(b.dateDebut) - new Date(a.dateDebut))
+                .sort((a, b) => new Date(b.date_debut) - new Date(a.date_debut))
                 .map(experience => (
                   <ExperienceCard
                     key={experience.id}
