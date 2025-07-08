@@ -185,7 +185,7 @@ const ExperienceCard = React.memo(({ experience, isSelected, onSelect, onDelete,
   );
 });
 
-const Portfolio = ({ user, projects, skills, experiences, updateUser, loadData}) => {
+const Portfolio = ({ user, projects, skills, experiences, updateUser, updateProjects, updateSkills, updateExperiences, loadData}) => {
   // Formulaire contact (local)
   const [activeSection, setActiveSection] = useState('hero');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -323,11 +323,21 @@ async function handleExperienceSubmit(e) {
     
     if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
     
+    const result = await resp.json();
+    
+    // 🚀 MISE À JOUR OPTIMISTE
+    if (editingExperience) {
+      const updatedExperiences = experiences.map(e => e.id === editingExperience.id ? result.experience : e);
+      if (updateExperiences) updateExperiences(updatedExperiences);
+    } else {
+      const updatedExperiences = [...experiences, result.experience];
+      if (updateExperiences) updateExperiences(updatedExperiences);
+    }
+    
     setShowExperienceForm(false);
     setEditingExperience(null);
     setSelectedExperienceId(null);
     setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "" });
-    await loadData();
   } catch (err) {
     setFormError("Erreur : " + err.message);
   }
@@ -361,23 +371,38 @@ async function confirmDelete() {
     if (modalType === "project") {
       const resp = await fetch(`/api/projects/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
-      await loadData();
+      
+      // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate du projet
+      const updatedProjects = projects.filter(p => p.id !== modalTargetId);
+      if (updateProjects) updateProjects(updatedProjects);
+      
       setSelectedProjectId(null);
     } else if (modalType === "skill") {
       const resp = await fetch(`/api/skills/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
-      await loadData();
+      
+      // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate de la compétence
+      const updatedSkills = skills.filter(s => s.id !== modalTargetId);
+      if (updateSkills) updateSkills(updatedSkills);
+      
       setSelectedSkillId(null);
-    } else if (modalType === "experience") { // NOUVEAU CAS
+    } else if (modalType === "experience") {
       const resp = await fetch(`/api/experiences/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
-      await loadData();
+      
+      // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate de l'expérience
+      const updatedExperiences = experiences.filter(e => e.id !== modalTargetId);
+      if (updateExperiences) updateExperiences(updatedExperiences);
+      
       setSelectedExperienceId(null);
     }
     closeDeleteModal();
   } catch (err) {
     alert("Erreur suppression : " + err.message);
     closeDeleteModal();
+    
+    // 🚀 EN CAS D'ERREUR, recharger les données pour restaurer l'état correct
+    if (loadData) await loadData(true);
   }
 }
 
@@ -600,11 +625,22 @@ async function handleProjectSubmit(e) {
       }),
     });
     if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+    
+    const result = await resp.json();
+    
+    // 🚀 MISE À JOUR OPTIMISTE
+    if (editingProject) {
+      const updatedProjects = projects.map(p => p.id === editingProject.id ? result.project : p);
+      if (updateProjects) updateProjects(updatedProjects);
+    } else {
+      const updatedProjects = [...projects, result.project];
+      if (updateProjects) updateProjects(updatedProjects);
+    }
+    
     setShowProjectForm(false);
     setEditingProject(null);
     setSelectedProjectId(null);
     setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "" });
-    await loadData();
   } catch (err) {
     setFormError("Erreur : " + err.message);
   }
@@ -636,14 +672,23 @@ async function handleSkillSubmit(e) {
     });
     if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
 
+    const result = await resp.json();
+    
+    // 🚀 MISE À JOUR OPTIMISTE
+    if (editingSkill) {
+      const updatedSkills = skills.map(s => s.id === editingSkill.id ? result.skill : s);
+      if (updateSkills) updateSkills(updatedSkills);
+    } else {
+      const updatedSkills = [...skills, result.skill];
+      if (updateSkills) updateSkills(updatedSkills);
+    }
+
     setShowSkillForm(false);
     setEditingSkill(null);
     setSelectedSkillId(null);
     setSkillForm({ category: "", items: "", icon_name: "" });
-    setManualCategory("");     // reset ici aussi
+    setManualCategory("");
     setIsManualCategory(false);
-
-    await loadData();
   } catch (err) {
     setFormError("Erreur : " + err.message);
   }
