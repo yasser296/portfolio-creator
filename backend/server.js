@@ -430,7 +430,7 @@ app.get('/api/users', async (req, res) => {
       SELECT 
         id, name, email, title, description, experience_years, location,
         phone, github_url, linkedin_url, personal_website,
-        avatar_url, hero_background, theme_color, custom_slug
+        avatar_url, hero_background, theme_color
       FROM users
       WHERE is_active = true
       ORDER BY created_at DESC
@@ -511,7 +511,7 @@ app.put('/api/users/:id', async (req, res) => {
       'name', 'email', 'title', 'description', 'experience_years',
       'location', 'phone', 'github_url', 'linkedin_url', 
       'personal_website', 'avatar_url', 'hero_background',
-      'theme_color', 'custom_slug'
+      'theme_color' // RETIRER custom_slug d'ici
     ];
     
     // Filtrer uniquement les champs autorisés
@@ -563,7 +563,7 @@ app.put('/api/users/:id', async (req, res) => {
       message: 'Erreur lors de la mise à jour' 
     });
   }
-});
+})
 
 // Route pour mettre à jour un projet
 app.put('/api/projects/:id', async (req, res) => {
@@ -834,7 +834,6 @@ app.get('/api/skills_reference', async (req, res) => {
 // Route pour créer un nouvel utilisateur (portfolio)
 app.post('/api/users', async (req, res) => {
   try {
-    // 1) Récupérer les champs depuis le corps de la requête
     const {
       name,
       email,
@@ -849,11 +848,10 @@ app.post('/api/users', async (req, res) => {
       avatar_url = null,
       hero_background = null,
       theme_color = null,
-      custom_slug = null,
       is_active = true
     } = req.body;
 
-    // 2) Validation minimale
+    // Validation minimale
     if (!name || !email) {
       return res.status(400).json({
         success: false,
@@ -861,16 +859,16 @@ app.post('/api/users', async (req, res) => {
       });
     }
 
-    // 3) Insertion en base avec RETURNING *
-     const result = await pool.query(
+    // Insertion en base SANS custom_slug
+    const result = await pool.query(
       `INSERT INTO users
         (name, email, title, description, experience_years, location, phone,
          github_url, linkedin_url, personal_website, avatar_url, hero_background,
-         theme_color, custom_slug, is_active)
+         theme_color, is_active)
        VALUES
         ($1, $2, $3, $4, $5, $6, $7,
          $8, $9, $10, $11, $12,
-         $13, $14, $15)
+         $13, $14)
        RETURNING *`,
       [
         name,
@@ -886,12 +884,10 @@ app.post('/api/users', async (req, res) => {
         avatar_url,
         hero_background,
         theme_color,
-        custom_slug,
         is_active
       ]
     );
 
-    // 4) Renvoi de l’utilisateur créé
     const newUser = result.rows[0];
     res.status(201).json({
       success: true,
@@ -900,14 +896,14 @@ app.post('/api/users', async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur création user:', error);
-    // Cas où c’est une violation d’unicité sur l’email (code postgres 23505)
+    
     if (error.code === "23505" && error.constraint === "users_email_key") {
       return res.status(400).json({ 
         success: false,
         message: "Cet email existe déjà." 
       });
     }
-    // Autres erreurs : ne pas exposer le détail technique
+    
     console.error('Erreur détaillée:', error.message);
     return res.status(500).json({ 
       success: false,

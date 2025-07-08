@@ -17,7 +17,6 @@ const initialForm = {
   avatar_url: '',
   hero_background: '',
   theme_color: '#4638f4',
-  custom_slug: '',
   is_active: true
 };
 
@@ -791,7 +790,7 @@ function SkillFormModal({ onClose, onSave, initialData, skillsReference = [] }) 
             } else {
               setIsCustomCategory(false);
               setManualCategory("");
-              setForm(f => ({ ...f, category: cat, items: "" }));
+              setForm(f => ({ ...f, category: cat }));
             }
           }}
           required
