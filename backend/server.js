@@ -486,6 +486,351 @@ app.get('/api/users/:id', async (req, res) => {
   }
 });
 
+// Supprimer un utilisateur/portfolio par ID
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Optionnel : vérifier si l'utilisateur existe avant de supprimer
+    const check = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (check.rows.length === 0) return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+
+    // Suppression (provoque le ON DELETE CASCADE sur les tables enfants)
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Erreur suppression utilisateur:", e);
+    res.status(500).json({ success: false, message: 'Suppression échouée' });
+  }
+});
+
+// Route pour mettre à jour un utilisateur
+app.put('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const allowedFields = [
+      'name', 'email', 'title', 'description', 'experience_years',
+      'location', 'phone', 'github_url', 'linkedin_url', 
+      'personal_website', 'avatar_url', 'hero_background',
+      'theme_color', 'custom_slug'
+    ];
+    
+    // Filtrer uniquement les champs autorisés
+    const updates = {};
+    allowedFields.forEach(field => {
+      if (req.body.hasOwnProperty(field)) {
+        updates[field] = req.body[field];
+      }
+    });
+    
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Aucun champ à mettre à jour' 
+      });
+    }
+    
+    // Construire la requête UPDATE dynamiquement
+    const setClause = Object.keys(updates)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
+    
+    const values = [id, ...Object.values(updates)];
+    
+    const result = await pool.query(
+      `UPDATE users 
+       SET ${setClause}, updated_at = NOW() 
+       WHERE id = $1 AND is_active = true
+       RETURNING *`,
+      values
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Utilisateur non trouvé' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Utilisateur mis à jour avec succès',
+      user: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour utilisateur:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la mise à jour' 
+    });
+  }
+});
+
+// Route pour mettre à jour un projet
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      title, description, technologies, 
+      image_url, github_url, demo_url, featured 
+    } = req.body;
+    
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (technologies !== undefined) updates.technologies = JSON.stringify(technologies);
+    if (image_url !== undefined) updates.image_url = image_url;
+    if (github_url !== undefined) updates.github_url = github_url;
+    if (demo_url !== undefined) updates.demo_url = demo_url;
+    if (featured !== undefined) updates.featured = featured;
+    
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Aucun champ à mettre à jour' 
+      });
+    }
+    
+    const setClause = Object.keys(updates)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
+    
+    const values = [id, ...Object.values(updates)];
+    
+    const result = await pool.query(
+      `UPDATE projects 
+       SET ${setClause}, updated_at = NOW() 
+       WHERE id = $1
+       RETURNING *`,
+      values
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Projet non trouvé' 
+      });
+    }
+    
+    const project = {
+      ...result.rows[0],
+      technologies: JSON.parse(result.rows[0].technologies || '[]')
+    };
+    
+    res.json({ 
+      success: true, 
+      message: 'Projet mis à jour avec succès',
+      project 
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour projet:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la mise à jour' 
+    });
+  }
+});
+
+// Route pour mettre à jour une compétence
+app.put('/api/skills/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category, items, icon_name, display_order } = req.body;
+    
+    const updates = {};
+    if (category !== undefined) updates.category = category;
+    if (items !== undefined) updates.items = JSON.stringify(items);
+    if (icon_name !== undefined) updates.icon_name = icon_name;
+    if (display_order !== undefined) updates.display_order = display_order;
+    
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Aucun champ à mettre à jour' 
+      });
+    }
+    
+    const setClause = Object.keys(updates)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
+    
+    const values = [id, ...Object.values(updates)];
+    
+    const result = await pool.query(
+      `UPDATE skills 
+       SET ${setClause}, updated_at = NOW() 
+       WHERE id = $1
+       RETURNING *`,
+      values
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Compétence non trouvée' 
+      });
+    }
+    
+    const skill = {
+      ...result.rows[0],
+      items: JSON.parse(result.rows[0].items || '[]')
+    };
+    
+    res.json({ 
+      success: true, 
+      message: 'Compétence mise à jour avec succès',
+      skill 
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour compétence:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la mise à jour' 
+    });
+  }
+});
+
+// Route pour supprimer un projet
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Option 1: Suppression logique (recommandé)
+    // const result = await pool.query(
+    //   `UPDATE projects 
+    //    SET is_active = false, updated_at = NOW() 
+    //    WHERE id = $1
+    //    RETURNING id`,
+    //   [id]
+    // );
+    
+    // Option 2: Suppression physique (décommentez si préféré)
+    const result = await pool.query(
+      'DELETE FROM projects WHERE id = $1 RETURNING id',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Projet non trouvé' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Projet supprimé avec succès' 
+    });
+  } catch (error) {
+    console.error('Erreur suppression projet:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la suppression' 
+    });
+  }
+});
+
+// Route pour supprimer une compétence
+app.delete('/api/skills/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Option 1: Suppression logique
+    // const result = await pool.query(
+    //   `UPDATE skills 
+    //    SET is_active = false, updated_at = NOW() 
+    //    WHERE id = $1
+    //    RETURNING id`,
+    //   [id]
+    // );
+    
+    // Option 2: Suppression physique (décommentez si préféré)
+    const result = await pool.query(
+    'DELETE FROM skills WHERE id = $1 RETURNING id',
+    [id]
+     );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Compétence non trouvée' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Compétence supprimée avec succès' 
+    });
+  } catch (error) {
+    console.error('Erreur suppression compétence:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la suppression' 
+    });
+  }
+});
+
+// Route pour mettre à jour partiellement un utilisateur (PATCH)
+app.patch('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const field = Object.keys(req.body)[0];
+    const value = req.body[field];
+    
+    if (!field || value === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Aucun champ à mettre à jour' 
+      });
+    }
+    
+    const allowedFields = [
+      'name', 'email', 'title', 'description', 'location',
+      'phone', 'github_url', 'linkedin_url', 'experience_years'
+    ];
+    
+    if (!allowedFields.includes(field)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Le champ ${field} n'est pas autorisé` 
+      });
+    }
+    
+    const result = await pool.query(
+      `UPDATE users 
+       SET ${field} = $2, updated_at = NOW() 
+       WHERE id = $1
+       RETURNING *`,
+      [id, value]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Utilisateur non trouvé' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `${field} mis à jour avec succès`,
+      user: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Erreur patch utilisateur:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la mise à jour' 
+    });
+  }
+});
+
+// Route pour récupérer les références de compétences
+app.get('/api/skills_reference', async (req, res) => {
+  const result = await pool.query("SELECT * FROM skills_reference ORDER BY category, skill_name");
+  res.json(result.rows);
+});
+
+
 // Route pour créer un nouvel utilisateur (portfolio)
 app.post('/api/users', async (req, res) => {
   try {
@@ -555,10 +900,13 @@ app.post('/api/users', async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur création user:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la création de l’utilisateur'
-    });
+    // Cas où c’est une violation d’unicité sur l’email (code postgres 23505)
+    if (err.code === "23505" && err.constraint === "users_email_key") {
+      return res.status(400).json({ message: "Cet email existe déjà." });
+    }
+    // Autres erreurs : ne pas exposer le détail technique
+    console.error('Erreur création user:', err); // On log pour debug interne
+    return res.status(500).json({ message: "Erreur serveur. Veuillez réessayer plus tard." });
   }
 });
 
@@ -588,6 +936,9 @@ app.get('/', (req, res) => {
     }
   });
 });
+
+
+
 
 // Gestion des erreurs globales
 app.use((error, req, res, next) => {

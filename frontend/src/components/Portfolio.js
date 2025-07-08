@@ -1,28 +1,158 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Pencil } from 'lucide-react';  
+import CreatableSelect from 'react-select/creatable';
+
 
 
 import {
   ChevronDown, Mail, Phone, MapPin, Github, Linkedin, ExternalLink, Code, Palette, Server, Smartphone
 } from 'lucide-react';
 
-const Portfolio = ({ user}) => {
+const Portfolio = ({ user, projects, skills, updateUser, loadData}) => {
   // Formulaire contact (local)
-  const [projects, setProjects] = useState([]);
-  const [skills, setSkills] = useState([]);
   const [activeSection, setActiveSection] = useState('hero');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
   const [submitStatus, setSubmitStatus] = useState({ loading: false, message: '', type: '' });
   
   // Avant ton return du composant
-const [showSkillForm, setShowSkillForm] = useState(false);
-const [showProjectForm, setShowProjectForm] = useState(false);
-const [skillForm, setSkillForm] = useState({ category: "", items: "", icon_name: "", id: null });
-const [projectForm, setProjectForm] = useState({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
+  // Pour la section projets
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [editingProject, setEditingProject] = useState(null); // projet en édition ou null
+  const [projectForm, setProjectForm] = useState({
+    title: "",
+    description: "",
+    technologies: "",
+    image_url: "",
+    github_url: "",
+    demo_url: "",
+  });
+
+  // Pour la section compétences
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [editingSkill, setEditingSkill] = useState(null); // compétence en édition ou null
+  const [skillForm, setSkillForm] = useState({
+    category: "",
+    items: "",
+    icon_name: "",
+  });
+
 const [formError, setFormError] = useState("");
 const [selectedSkillId, setSelectedSkillId] = useState(null);
 const [selectedProjectId, setSelectedProjectId] = useState(null);
+
+const [editingField, setEditingField] = useState(null); // nom du champ édité
+const [editValue, setEditValue] = useState('');
+const [savingEdit, setSavingEdit] = useState(false);
+
+const [saveStatus, setSaveStatus] = useState(null);
+
+// const [deletingId, setDeletingId] = useState(null); // Pour la confirmation
+
+const [modalOpen, setModalOpen] = useState(false);
+const [modalType, setModalType] = useState(""); // "project" ou "skill"
+const [modalTargetId, setModalTargetId] = useState(null);
+
+const [referenceSkills, setReferenceSkills] = useState([]);
+const [availableCategories, setAvailableCategories] = useState([]);
+// const [availableSkills] = useState([]);
+
+const [selectedTechCategory, setSelectedTechCategory] = useState("");
+// const [skillsReference, setSkillsReference] = useState([]);
+const [manualCategory, setManualCategory] = useState("");
+// const [manualSkill, setManualSkill] = useState("");
+const [isManualCategory, setIsManualCategory] = useState(false); // pour forcer le rendu
+
+
+useEffect(() => {
+  fetch('/api/skills_reference')
+    .then(res => res.json())
+    .then(data => {
+      setReferenceSkills(Array.isArray(data) ? data : []);
+      setAvailableCategories([...new Set(data.map(s => s.category))]);
+    });
+}, []);
+
+
+function openDeleteModal(type, id) {
+  setModalType(type);
+  setModalTargetId(id);
+  setModalOpen(true);
+}
+
+function closeDeleteModal() {
+  setModalOpen(false);
+  setModalType("");
+  setModalTargetId(null);
+}
+
+// Handler global pour la suppression selon le type :
+async function confirmDelete() {
+  try {
+    if (modalType === "project") {
+      const resp = await fetch(`/api/projects/${modalTargetId}`, { method: "DELETE" });
+      if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+      await loadData();
+      setSelectedProjectId(null);
+    } else if (modalType === "skill") {
+      const resp = await fetch(`/api/skills/${modalTargetId}`, { method: "DELETE" });
+      if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+      await loadData();
+      setSelectedSkillId(null);
+    }
+    closeDeleteModal();
+  } catch (err) {
+    alert("Erreur suppression : " + err.message);
+    closeDeleteModal();
+  }
+}
+
+
+
+
+function cancelEdit() {
+  setEditingField(null);
+  setEditValue("");
+}
+
+const startEdit = (field, value) => {
+  setEditingField(field);
+  setEditValue(value || '');
+};
+
+const saveEdit = async () => {
+  if (!editingField || !updateUser) return;
+  setSavingEdit(true);
+  setSaveStatus('saving');
+  
+  try {
+    const result = await updateUser({ [editingField]: editValue });
+    
+    if (result.success) {
+      setEditingField(null);
+      setEditValue("");
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 3000);
+    }
+  } catch (err) {
+    console.error("Erreur sauvegarde:", err);
+    setSaveStatus('error');
+    setTimeout(() => setSaveStatus(null), 3000);
+  } finally {
+    setSavingEdit(false);
+  }
+};
+
+
+
+const handleEditKeyDown = (e) => {
+  if (e.key === "Enter") saveEdit();
+  if (e.key === "Escape") setEditingField(null);
+};
 
 // Pour désélectionner en cliquant sur le fond
 const clearSelections = () => {
@@ -30,24 +160,65 @@ const clearSelections = () => {
   setSelectedProjectId(null);
 };  
 
-  const loadData = async () => {
-    try {
-      if (!user?.id) return;
-      const projRes = await fetch(`/api/users/${user.id}/projects`);
-      setProjects(await projRes.json());
-      const skillsRes = await fetch(`/api/users/${user.id}/skills`);
-      setSkills(await skillsRes.json());
-    } catch (err) {
-      setFormError("Erreur lors du chargement des données");
-      console.error("Erreur loadData:", err);
-    }
-  };
+  //   // Fonction loadData améliorée pour les projets et compétences
+  // const loadProjectsAndSkills = async () => {
+  //   try {
+  //     if (!user?.id) return;
+      
+  //     // Charger les projets
+  //     const projRes = await fetch(`/api/users/${user.id}/projects`);
+  //     if (projRes.ok) {
+  //       const projectsData = await projRes.json();
+  //       setProjects(projectsData);
+  //       if (updateProjects) updateProjects(projectsData);
+  //     }
+      
+  //     // Charger les compétences
+  //     const skillsRes = await fetch(`/api/users/${user.id}/skills`);
+  //     if (skillsRes.ok) {
+  //       const skillsData = await skillsRes.json();
+  //       setSkills(skillsData);
+  //       if (updateSkills) updateSkills(skillsData);
+  //     }
+  //   } catch (err) {
+  //     setFormError("Erreur lors du chargement des données");
+  //     console.error("Erreur loadData:", err);
+  //   }
+  // };
 
-  useEffect(() => {
-  if (user?.id) loadData();
-}, [user]);
 
- 
+
+  
+
+
+
+
+
+  // const handleProjectSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setFormError("");
+    
+  //   if (!projectForm.title || !projectForm.description) {
+  //     setFormError("Titre et description sont obligatoires.");
+  //     return;
+  //   }
+    
+  //   await saveProject(projectForm);
+  // };
+
+  // const handleSkillSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setFormError("");
+    
+  //   if (!skillForm.category || !skillForm.items) {
+  //     setFormError("Catégorie et liste des compétences sont obligatoires.");
+  //     return;
+  //   }
+    
+  //   await saveSkill(skillForm);
+  // };
+
+  
 
 
    // Configuration API (solution simple et robuste)
@@ -130,6 +301,82 @@ const clearSelections = () => {
     return icons[iconName] || Code;
   };
 
+
+
+// Pour valider l'ajout/la modification d'un projet
+async function handleProjectSubmit(e) {
+  e.preventDefault();
+  setFormError("");
+  if (!projectForm.title || !projectForm.description) {
+    setFormError("Titre et description obligatoires.");
+    return;
+  }
+  try {
+    const url = editingProject ? `/api/projects/${editingProject.id}` : "/api/projects";
+    const method = editingProject ? "PUT" : "POST";
+    const resp = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...projectForm,
+        user_id: user.id,
+        technologies: projectForm.technologies
+          ? projectForm.technologies.split(",").map(s => s.trim())
+          : []
+      }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+    setShowProjectForm(false);
+    setEditingProject(null);
+    setSelectedProjectId(null);
+    setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "" });
+    await loadData();
+  } catch (err) {
+    setFormError("Erreur : " + err.message);
+  }
+}
+
+
+
+async function handleSkillSubmit(e) {
+  e.preventDefault();
+  setFormError("");
+  const finalCategory = isManualCategory ? manualCategory : skillForm.category;
+
+  if (!finalCategory.trim() || !skillForm.items.trim()) {
+    setFormError("Catégorie et compétences obligatoires.");
+    return;
+  }
+  try {
+    const url = editingSkill ? `/api/skills/${editingSkill.id}` : "/api/skills";
+    const method = editingSkill ? "PUT" : "POST";
+    const resp = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...skillForm,
+        category: finalCategory,
+        user_id: user.id,
+        items: skillForm.items.split(",").map(s => s.trim()),
+      }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+
+    setShowSkillForm(false);
+    setEditingSkill(null);
+    setSelectedSkillId(null);
+    setSkillForm({ category: "", items: "", icon_name: "" });
+    setManualCategory("");     // reset ici aussi
+    setIsManualCategory(false);
+
+    await loadData();
+  } catch (err) {
+    setFormError("Erreur : " + err.message);
+  }
+}
+
+
+
   // Gérer les changements du formulaire
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -145,7 +392,7 @@ const clearSelections = () => {
     setSubmitStatus({ loading: true, message: '', type: '' });
 
     try {
-      const response = await fetch(`${API_BASE}/contact`, {
+      const response = await fetch('/api/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,8 +434,61 @@ const clearSelections = () => {
     }, 5000);
   };
 
+  const SaveStatusIndicator = () => {
+  if (!saveStatus) return null;
+  
+  let bgColor = '';
+  let message = '';
+  
+  switch (saveStatus) {
+    case 'saving':
+      bgColor = 'bg-blue-600';
+      message = '⏳ Sauvegarde...';
+      break;
+    case 'success':
+      bgColor = 'bg-green-600';
+      message = '✅ Sauvegardé !';
+      break;
+    case 'error':
+      bgColor = 'bg-red-600';
+      message = '❌ Erreur';
+      break;
+  }
+  
   return (
+    <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white ${bgColor}`}>
+      {message}
+    </div>
+  );
+};
+
+
+
+// Filtrer les compétences selon la catégorie sélectionnée
+const filteredSkillOptions = referenceSkills
+  .filter(s => s.category === skillForm.category)
+  .map(s => ({
+    value: s.skill_name,
+    label: s.skill_name
+  }));
+
+  // Génère les options à partir des compétences de référence
+const techOptions = referenceSkills
+  .filter(s => !selectedTechCategory || s.category === selectedTechCategory)
+  .map(s => ({
+    value: s.skill_name,
+    label: s.skill_name
+  }));
+
+
+
+
+
+  return (
+
+
     <div className="min-h-screen bg-gray-900 text-white">
+      <SaveStatusIndicator />
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -265,17 +565,59 @@ const clearSelections = () => {
                 </div>
             </div>
 
-            <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow">
-                {user?.name || "John Doe"}
-            </h1>
+            {/* Nom */}
 
-            <div className="text-base md:text-lg text-blue-200 font-semibold mb-1 uppercase tracking-wider">
-                {user?.title || "Développeur Full Stack"}
+            <div className="font-bold text-4xl md:text-5xl mb-2">
+              {editingField === "name" ? (
+                <input
+                  className="px-2 py-1 rounded bg-gray-800 text-white"
+                  value={editValue}
+                  autoFocus
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={saveEdit}
+                  onKeyDown={handleEditKeyDown}
+                  disabled={savingEdit}
+                />
+              ) : (
+                <span
+                  className="cursor-pointer hover:underline"
+                  title="Modifier le nom"
+                  onClick={() => startEdit("name", user.name)}
+                >
+                  {user.name}
+                </span>
+              )}
             </div>
 
-            <p className="text-base md:text-lg text-slate-300 mb-6 max-w-xl text-center leading-relaxed">
+            {/* Titre */}
+
+
+            <div className="text-blue-400 mb-2">
+              {editingField === "title" ? (
+                <input
+                  className="px-2 py-1 rounded bg-gray-800 text-white"
+                  value={editValue}
+                  autoFocus
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={saveEdit}
+                  onKeyDown={handleEditKeyDown}
+                  disabled={savingEdit}
+                />
+              ) : (
+                <span
+                  className="cursor-pointer hover:underline"
+                  title="Modifier le titre"
+                  onClick={() => startEdit("title", user.title)}
+                >
+                  {user.title}
+                </span>
+              )}
+            </div>
+
+
+            {/* <p className="text-base md:text-lg text-slate-300 mb-6 max-w-xl text-center leading-relaxed">
                 {user?.description || "Passionné par la création d'expériences numériques exceptionnelles avec React, Node.js et PostgreSQL"}
-            </p>
+            </p> */}
 
             <div className="flex justify-center space-x-4 mb-6">
                 <a href={user?.github_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-[#24264a] rounded-full hover:bg-blue-500/70 transition" title="GitHub">
@@ -309,10 +651,35 @@ const clearSelections = () => {
           </h2>
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <h3 className="text-2xl font-semibold mb-6 text-blue-400">Mon Histoire</h3>
-              <p className="text-gray-300 mb-6 leading-relaxed">
-                {user?.description}
-              </p>
+              <h3 className="text-2xl font-semibold mb-6 text-blue-400">Mon parcours</h3>
+
+                {/* Description */}
+
+              <div className="text-gray-300 mb-4">
+                {editingField === "description" ? (
+                  <textarea
+                    className="px-2 py-1 rounded bg-gray-800 text-white w-full"
+                    value={editValue}
+                    autoFocus
+                    onChange={e => setEditValue(e.target.value)}
+                    onBlur={saveEdit}
+                    onKeyDown={handleEditKeyDown}
+                    disabled={savingEdit}
+                    rows={3}
+                  />
+                ) : (
+                  <span
+                    className="cursor-pointer hover:underline"
+                    title="Modifier la description"
+                    onClick={() => startEdit("description", user.description)}
+                  >
+                    {user.description}
+                  </span>
+                )}
+              </div>
+
+
+
               <div className="flex space-x-6">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-400">{stats.projects}+</div>
@@ -365,146 +732,244 @@ const clearSelections = () => {
 
       {/* Skills Section */}
       <section id="skills" className="py-20 px-4 bg-gray-800/50" onClick={clearSelections}>
-  <div className="flex gap-4 justify-end mb-6">
-    <button
-      onClick={e => { e.stopPropagation(); setShowSkillForm(true); setSkillForm({ category: "", items: "", icon_name: "", id: null }); setFormError(""); }}
-      className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow"
-    >
-      + Ajouter une compétence
-    </button>
-    <button
-      disabled={!selectedSkillId}
-      onClick={e => {
-        e.stopPropagation();
-        const skill = skills.find(sk => sk.id === selectedSkillId);
-        if (skill) {
-          setSkillForm({
-            ...skill,
-            items: Array.isArray(skill.items) ? skill.items.join(", ") : skill.items || "",
-            id: skill.id
-          });
-          setShowSkillForm(true);
-          setFormError("");
-        }
-      }}
-      className={`px-4 py-2 rounded font-semibold shadow
-        ${selectedSkillId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
-    >
-      Modifier la compétence
-    </button>
-  </div>
-
-  {showSkillForm && (
-    <form
-      className="bg-gray-900 p-6 rounded-xl mb-6 shadow-lg max-w-xl mx-auto flex flex-col gap-3"
-      onClick={e => e.stopPropagation()}
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setFormError("");
-        if (!skillForm.category || !skillForm.items) {
-          setFormError("Catégorie et liste des compétences sont obligatoires.");
-          return;
-        }
-        try {
-          const method = skillForm.id ? "PUT" : "POST";
-          const url = skillForm.id ? `/api/skills/${skillForm.id}` : "/api/skills";
-          const resp = await fetch(url, {
-            method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...skillForm,
-              user_id: user.id,
-              items: skillForm.items.split(",").map(s => s.trim()),
-            }),
-          });
-          if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(err.message || "Erreur inconnue");
-          }
-          setShowSkillForm(false);
-          setSkillForm({ category: "", items: "", icon_name: "", id: null });
-          await loadData();
-        } catch (err) {
-          setFormError("Erreur lors de l'enregistrement : " + err.message);
-        }
-      }}
-    >
-      <h3 className="font-bold text-lg mb-2 text-purple-300">{skillForm.id ? "Modifier la compétence" : "Nouvelle compétence"}</h3>
-      {formError && <div className="text-red-400 mb-2">{formError}</div>}
-      <input
-        type="text"
-        className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-        placeholder="Catégorie (ex: Backend, Frontend, DevOps)"
-        value={skillForm.category}
-        onChange={e => setSkillForm(f => ({ ...f, category: e.target.value }))}
-        required
-      />
-      <input
-        type="text"
-        className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-        placeholder="Compétences (séparées par virgule)"
-        value={skillForm.items}
-        onChange={e => setSkillForm(f => ({ ...f, items: e.target.value }))}
-        required
-      />
-      <input
-        type="text"
-        className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-        placeholder="Nom de l’icône (optionnel, ex: Code, Server...)"
-        value={skillForm.icon_name}
-        onChange={e => setSkillForm(f => ({ ...f, icon_name: e.target.value }))}
-      />
-      <div className="flex gap-4 mt-2">
-        <button type="submit" className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white font-semibold">
-          {skillForm.id ? "Mettre à jour" : "Ajouter"}
-        </button>
-        <button type="button" className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
-          onClick={() => { setShowSkillForm(false); setSkillForm({ category: "", items: "", icon_name: "", id: null }); }}>
-          Annuler
-        </button>
-      </div>
-    </form>
-  )}
-
-  <div className="max-w-6xl mx-auto">
-    <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-      Compétences
-    </h2>
-    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-      {skills && skills.length > 0 ? (
-        skills.map(skill => {
-          const IconComponent = getIconComponent(skill.icon_name);
-          const items = Array.isArray(skill.items) ? skill.items : [];
-          return (
-            <div
-              key={skill.id}
-              onClick={e => { e.stopPropagation(); setSelectedSkillId(skill.id); }}
-              tabIndex={0}
-              className={`bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-colors border-2 cursor-pointer
-                ${selectedSkillId === skill.id ? "border-yellow-400" : "border-transparent"}`}
-            >
-              <div className="flex items-center mb-4">
-                <IconComponent className="w-8 h-8 text-blue-400 mr-3" />
-                <h3 className="text-xl font-semibold">{skill.category}</h3>
-              </div>
-              <ul className="space-y-2">
-                {items.map((item, itemIndex) => (
-                  <li key={itemIndex} className="text-gray-300 text-sm">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })
-      ) : (
-        <div className="col-span-full text-center py-12">
-          <p className="text-gray-400 text-lg">Aucune compétence à afficher.</p>
+        <div className="flex gap-4 justify-end mb-6">
+          <button
+            onClick={e => { e.stopPropagation(); setShowSkillForm(true); setSkillForm({ category: "", items: "", icon_name: "", id: null }); setFormError(""); }}
+            className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow"
+          >
+            + Ajouter une compétence
+          </button>
+          <button
+            disabled={!selectedSkillId}
+            onClick={e => {
+              e.stopPropagation();
+              const skill = skills.find(sk => sk.id === selectedSkillId);
+              if (skill) {
+                setSkillForm({
+                  ...skill,
+                  items: Array.isArray(skill.items) ? skill.items.join(", ") : skill.items || "",
+                  id: skill.id
+                });
+                setShowSkillForm(true);
+                setFormError("");
+              }
+            }}
+            className={`px-4 py-2 rounded font-semibold shadow
+              ${selectedSkillId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
+          >
+            Modifier la compétence
+          </button>
         </div>
-      )}
-    </div>
-  </div>
-</section>
+
+        {showSkillForm && (
+          <form
+            className="bg-gray-900 p-6 rounded-xl mb-6 shadow-lg max-w-xl mx-auto flex flex-col gap-3"
+            onSubmit={handleSkillSubmit}
+          >
+            <h3 className="font-bold text-lg mb-2 text-purple-300">
+              {skillForm.id ? "Modifier la compétence" : "Nouvelle compétence"}
+            </h3>
+            {formError && <div className="text-red-400 mb-2">{formError}</div>}
+
+            {/* Catégorie */}
+            <label className="text-sm font-semibold text-purple-300">Catégorie</label>
+            <select
+              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+              value={isManualCategory ? "custom" : skillForm.category}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === "custom") {
+                  setIsManualCategory(true);
+                  setManualCategory(""); // reset
+                  setSkillForm(f => ({ ...f, category: "", items: "" })); // réinitialise la catégorie stockée
+                } else {
+                  setIsManualCategory(false);
+                  setManualCategory("");
+                  setSkillForm(f => ({ ...f, category: val, items: "" }));
+                }
+              }}
+              required
+            >
+              <option value="">Choisir une catégorie</option>
+              {availableCategories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+              <option value="custom">Autre (saisir manuellement)</option>
+            </select>
+
+
+            {isManualCategory && (
+              <input
+                type="text"
+                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+                placeholder="Nom de la catégorie"
+                value={manualCategory}
+                onChange={e => setManualCategory(e.target.value)}
+                required
+              />
+            )}
+
+
+
+            {/* Compétence(s) - Multi, suggestions et création libre */}
+            <label className="text-sm font-semibold text-purple-300">Compétence(s)</label>
+            {skillForm.category && skillForm.category !== "custom" ? (
+              <CreatableSelect
+                isMulti
+                options={filteredSkillOptions}
+                value={
+                  skillForm.items
+                    ? skillForm.items.split(',').map(s => ({ value: s.trim(), label: s.trim() }))
+                    : []
+                }
+                onChange={selected =>
+                  setSkillForm(f => ({
+                    ...f,
+                    items: selected.map(o => o.value).join(', ')
+                  }))
+                }
+                placeholder="Choisissez ou tapez les compétences"
+                className="mb-4"
+                styles={{
+                  control: base => ({
+                    ...base,
+                    backgroundColor: '#23243a',
+                    color: 'white',
+                    borderColor: '#a084fa'
+                  }),
+                  input: base => ({
+                    ...base,
+                    color: 'white'
+                  }),
+                  menu: base => ({
+                    ...base,
+                    backgroundColor: '#2d2f42',
+                    color: 'white'
+                  }),
+                  multiValue: base => ({
+                    ...base,
+                    backgroundColor: '#a084fa',
+                    color: 'white'
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isFocused ? "#7c3aed" : "#23243a",
+                    color: 'white'
+                  }),
+                }}
+                maxMenuHeight={180}
+              />
+            )
+             : (
+              <input
+                type="text"
+                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+                placeholder="Compétences (séparées par virgule)"
+                value={skillForm.items}
+                onChange={e => setSkillForm(f => ({ ...f, items: e.target.value }))}
+              />
+            )}
+
+            
+
+            <div className="flex gap-4 mt-2">
+              <button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white font-semibold"
+              >
+                {skillForm.id ? "Modifier" : "Ajouter"}
+              </button>
+              <button
+                type="button"
+                className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
+                onClick={() => { setShowSkillForm(false); setSkillForm({ category: "", items: "", icon_name: "", id: null }); setEditingSkill(null); }}
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            Compétences
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {skills && skills.length > 0 ? (
+              skills.map(skill => {
+                const IconComponent = getIconComponent(skill.icon_name);
+                const items = Array.isArray(skill.items) ? skill.items : [];
+                return (
+                  <div
+                    key={skill.id}
+                    onClick={e => { e.stopPropagation(); setSelectedSkillId(skill.id); }}
+                    tabIndex={0}
+                    className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-colors border-2 cursor-pointer group
+                      ${selectedSkillId === skill.id ? "border-yellow-400" : "border-transparent"}`}
+                  >
+                    {/* Bouton X de suppression */}
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 bg-purple-700 hover:bg-purple-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
+                        title="Supprimer cette compétence"
+                        onClick={e => { e.stopPropagation(); openDeleteModal("skill", skill.id); }}
+                        tabIndex={-1}
+                      >
+                        ×
+                      </button>
+
+                    <div className="flex items-center mb-4">
+                      <IconComponent className="w-8 h-8 text-blue-400 mr-3" />
+                      <h3 className="text-xl font-semibold">{skill.category}</h3>
+                    </div>
+                    <ul className="space-y-2">
+                      {items.map((item, itemIndex) => (
+                        <li key={itemIndex} className="text-gray-300 text-sm">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <p className="text-gray-400 text-lg">Aucune compétence à afficher.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal de confirmation de suppression */}
+        {modalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[9999]">
+            <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl w-full max-w-xs text-center">
+              <h2 className="text-xl font-bold text-red-400 mb-3">Confirmer la suppression</h2>
+              <p className="text-gray-300 mb-6">
+                {modalType === "project"
+                  ? "Voulez-vous vraiment supprimer ce projet ? Cette action est irréversible."
+                  : "Voulez-vous vraiment supprimer cette compétence ? Cette action est irréversible."}
+              </p>
+              <div className="flex gap-4 justify-center">
+                <button
+                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-white font-semibold"
+                  onClick={confirmDelete}
+                >
+                  Supprimer
+                </button>
+                <button
+                  className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
+                  onClick={closeDeleteModal}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </section>
+
 
 
       
@@ -512,224 +977,290 @@ const clearSelections = () => {
       {/* Projects Section */}
       <section id="projects" className="py-20 px-4" onClick={clearSelections}>
         <div className="flex gap-4 justify-end mb-6">
-            <button
+          <button
             onClick={e => { 
-                e.stopPropagation(); 
-                setShowProjectForm(true); 
-                setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
-                setFormError("");
+              e.stopPropagation(); 
+              setShowProjectForm(true); 
+              setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
+              setFormError("");
             }}
             className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
-            >
+          >
             + Ajouter un projet
-            </button>
-            <button
+          </button>
+          <button
             disabled={!selectedProjectId}
             onClick={e => {
-                e.stopPropagation();
-                const proj = projects.find(p => p.id === selectedProjectId);
-                if (proj) {
+              e.stopPropagation();
+              const proj = projects.find(p => p.id === selectedProjectId);
+              if (proj) {
                 setProjectForm({
-                    ...proj,
-                    technologies: Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies || "",
-                    id: proj.id
+                  ...proj,
+                  technologies: Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies || "",
+                  id: proj.id
                 });
                 setShowProjectForm(true);
                 setFormError("");
-                }
+              }
             }}
             className={`px-4 py-2 rounded font-semibold shadow
-                ${selectedProjectId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
-            >
+              ${selectedProjectId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
+          >
             Modifier le projet
-            </button>
+          </button>
         </div>
 
-        {/* Formulaire projet (ajout ou édition) */}
         {showProjectForm && (
-            <form
+          <form
             className="bg-gray-900 p-6 rounded-xl mb-6 shadow-lg max-w-xl mx-auto flex flex-col gap-3"
-            onClick={e => e.stopPropagation()}
-            onSubmit={async (e) => {
-                e.preventDefault();
-                setFormError("");
-                // Validation simple
-                if (!projectForm.title || !projectForm.description) {
-                setFormError("Titre et description sont obligatoires.");
-                return;
-                }
-                try {
-                const method = projectForm.id ? "PUT" : "POST";
-                const url = projectForm.id ? `/api/projects/${projectForm.id}` : "/api/projects";
-                const resp = await fetch(url, {
-                    method,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                    ...projectForm,
-                    user_id: user.id,
-                    technologies: projectForm.technologies
-                        ? projectForm.technologies.split(",").map((s) => s.trim())
-                        : [],
-                    }),
-                });
-                if (!resp.ok) {
-                    const err = await resp.json();
-                    throw new Error(err.message || "Erreur inconnue");
-                }
-                setShowProjectForm(false);
-                setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
-                await loadData(); // Recharge la liste
-                } catch (err) {
-                setFormError("Erreur lors de l'enregistrement : " + err.message);
-                }
-            }}
-            >
+            onSubmit={handleProjectSubmit}
+          >
             <h3 className="font-bold text-lg mb-2 text-blue-300">
-                {projectForm.id ? "Modifier le projet" : "Nouveau projet"}
+              {projectForm.id ? "Modifier le projet" : "Nouveau projet"}
             </h3>
             {formError && <div className="text-red-400 mb-2">{formError}</div>}
-            <input
-                type="text"
-                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-                placeholder="Titre"
-                value={projectForm.title}
-                onChange={e => setProjectForm(f => ({ ...f, title: e.target.value }))}
-                required
-            />
+            <CreatableSelect
+  isMulti
+  options={techOptions}
+  value={
+    projectForm.technologies
+      ? projectForm.technologies.split(",").map(s => ({
+          value: s.trim(),
+          label: s.trim()
+        }))
+      : []
+  }
+  onChange={selected =>
+    setProjectForm(f => ({
+      ...f,
+      technologies: selected.map(o => o.value).join(", ")
+    }))
+  }
+  placeholder="Choisissez ou ajoutez les technologies utilisées"
+  className="mb-4"
+  styles={{
+    control: base => ({
+      ...base,
+      backgroundColor: '#23243a',
+      color: 'white',
+      borderColor: '#38bdf8'
+    }),
+    input: base => ({
+      ...base,
+      color: 'white'
+    }),
+    menu: base => ({
+      ...base,
+      backgroundColor: '#2d2f42',
+      color: 'white'
+    }),
+    multiValue: base => ({
+      ...base,
+      backgroundColor: '#38bdf8',
+      color: 'white'
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isFocused ? "#38bdf8" : "#23243a",
+      color: 'white'
+    }),
+  }}
+  maxMenuHeight={180}
+/>
+
             <textarea
-                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-                placeholder="Description"
-                value={projectForm.description}
-                onChange={e => setProjectForm(f => ({ ...f, description: e.target.value }))}
-                required
+              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+              placeholder="Description"
+              value={projectForm.description}
+              onChange={e => setProjectForm(f => ({ ...f, description: e.target.value }))}
+              required
+            />
+            {/* Sélecteur de catégorie (optionnel) */}
+            <select
+              value={selectedTechCategory}
+              onChange={e => setSelectedTechCategory(e.target.value)}
+              className="mb-2 px-3 py-2 rounded bg-gray-800 text-white"
+            >
+              <option value="">Toutes catégories</option>
+              {availableCategories.map(cat =>
+                <option key={cat} value={cat}>{cat}</option>
+              )}
+            </select>
+
+            {/* Champ technologies (autocomplétion, mais aussi libre) */}
+            <input
+              type="text"
+              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+              placeholder="Technologies utilisées (séparées par virgule)"
+              value={projectForm.technologies}
+              onChange={e => setProjectForm(f => ({ ...f, technologies: e.target.value }))}
+            />
+
+            {/* Suggestions (affichées sous l'input, filtrées par catégorie sélectionnée) */}
+           
+
+            <input
+              type="url"
+              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+              placeholder="Image (URL facultative)"
+              value={projectForm.image_url}
+              onChange={e => setProjectForm(f => ({ ...f, image_url: e.target.value }))}
             />
             <input
-                type="text"
-                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-                placeholder="Technologies (séparées par virgule)"
-                value={projectForm.technologies}
-                onChange={e => setProjectForm(f => ({ ...f, technologies: e.target.value }))}
+              type="url"
+              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+              placeholder="Lien GitHub (facultatif)"
+              value={projectForm.github_url}
+              onChange={e => setProjectForm(f => ({ ...f, github_url: e.target.value }))}
             />
             <input
-                type="url"
-                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-                placeholder="Image (URL facultative)"
-                value={projectForm.image_url}
-                onChange={e => setProjectForm(f => ({ ...f, image_url: e.target.value }))}
-            />
-            <input
-                type="url"
-                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-                placeholder="Lien GitHub (facultatif)"
-                value={projectForm.github_url}
-                onChange={e => setProjectForm(f => ({ ...f, github_url: e.target.value }))}
-            />
-            <input
-                type="url"
-                className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-                placeholder="Lien Démo (facultatif)"
-                value={projectForm.demo_url}
-                onChange={e => setProjectForm(f => ({ ...f, demo_url: e.target.value }))}
+              type="url"
+              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+              placeholder="Lien Démo (facultatif)"
+              value={projectForm.demo_url}
+              onChange={e => setProjectForm(f => ({ ...f, demo_url: e.target.value }))}
             />
             <div className="flex gap-4 mt-2">
-                <button
+              <button
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold"
-                >
-                {projectForm.id ? "Mettre à jour" : "Ajouter"}
-                </button>
-                <button
+              >
+                {projectForm.id ? "Modifier" : "Ajouter"}
+              </button>
+              <button
                 type="button"
                 className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
-                onClick={() => { setShowProjectForm(false); setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null }); }}
-                >
+                onClick={() => { setShowProjectForm(false); setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null }); setEditingProject(null); }}
+              >
                 Annuler
-                </button>
+              </button>
             </div>
-            </form>
+          </form>
         )}
 
         <div className="max-w-6xl mx-auto">
-            <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             Projets
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {projects && projects.length > 0 ? (
-                projects.map(project => (
+              projects.map(project => (
                 <div
-                    key={project.id}
-                    onClick={e => { e.stopPropagation(); setSelectedProjectId(project.id); }}
-                    tabIndex={0}
-                    className={`bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer
+                  key={project.id}
+                  onClick={e => { e.stopPropagation(); setSelectedProjectId(project.id); }}
+                  tabIndex={0}
+                  className={`bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer
                     ${selectedProjectId === project.id ? "border-yellow-400" : "border-transparent"}`}
                 >
-                    <img
+                  {/* Bouton X de suppression */}
+                    <button
+                      type="button"
+                      className="absolute top-2 right-2 bg-blue-700 hover:bg-blue-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow"
+                      title="Supprimer ce projet"
+                      onClick={e => { e.stopPropagation(); openDeleteModal("project", project.id); }}
+                      tabIndex={-1}
+                    >
+                      ×
+                    </button>
+
+                  <img
                     src={
-                        project.image_url?.startsWith('/')
+                      project.image_url?.startsWith('/')
                         ? `${process.env.PUBLIC_URL}${project.image_url}`
                         : project.image_url
                     }
                     alt={project.title}
                     className="w-full h-48 object-cover"
                     onError={e => { e.target.src = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=250&fit=crop'; }}
-                    />
-                    <div className="p-6">
+                  />
+                  <div className="p-6">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-xl font-semibold">{project.title}</h3>
-                        {project.featured && (
+                      <h3 className="text-xl font-semibold">{project.title}</h3>
+                      {project.featured && (
                         <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">
-                            ⭐ Featured
+                          ⭐ Featured
                         </span>
-                        )}
+                      )}
                     </div>
                     <p className="text-gray-300 mb-4 text-sm">{project.description}</p>
                     <div className="flex flex-wrap gap-2 mb-4">
-                        {Array.isArray(project.technologies) && project.technologies.map((tech, techIndex) => (
+                      {Array.isArray(project.technologies) && project.technologies.map((tech, techIndex) => (
                         <span key={techIndex} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs">
-                            {tech}
+                          {tech}
                         </span>
-                        ))}
+                      ))}
                     </div>
                     <div className="flex space-x-4 items-center">
-                        {project.github_url && (
+                      {project.github_url && (
                         <a
-                            href={project.github_url}
-                            className="flex items-center text-gray-400 hover:text-white transition-colors"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          href={project.github_url}
+                          className="flex items-center text-gray-400 hover:text-white transition-colors"
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                            <Github className="w-4 h-4 mr-1" />
-                            Code
+                          <Github className="w-4 h-4 mr-1" />
+                          Code
                         </a>
-                        )}
-                        {project.demo_url && (
+                      )}
+                      {project.demo_url && (
                         <a
-                            href={project.demo_url}
-                            className="flex items-center text-gray-400 hover:text-white transition-colors"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          href={project.demo_url}
+                          className="flex items-center text-gray-400 hover:text-white transition-colors"
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                            <ExternalLink className="w-4 h-4 mr-1" />
-                            Demo
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          Demo
                         </a>
-                        )}
-                        {project.view_count > 0 && (
+                      )}
+                      {project.view_count > 0 && (
                         <span className="text-gray-500 text-xs">
-                            👁️ {project.view_count}
+                          👁️ {project.view_count}
                         </span>
-                        )}
+                      )}
                     </div>
-                    </div>
+                  </div>
                 </div>
-                ))
+              ))
             ) : (
-                <div className="col-span-full text-center py-12">
+              <div className="col-span-full text-center py-12">
                 <p className="text-gray-400 text-lg">Aucun projet à afficher pour le moment.</p>
-                </div>
+              </div>
             )}
-            </div>
+          </div>
         </div>
-        </section>
+
+        {/* Modal de confirmation de suppression */}
+        {modalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[9999]">
+            <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl w-full max-w-xs text-center">
+              <h2 className="text-xl font-bold text-red-400 mb-3">Confirmer la suppression</h2>
+              <p className="text-gray-300 mb-6">
+                {modalType === "project"
+                  ? "Voulez-vous vraiment supprimer ce projet ? Cette action est irréversible."
+                  : "Voulez-vous vraiment supprimer cette compétence ? Cette action est irréversible."}
+              </p>
+              <div className="flex gap-4 justify-center">
+                <button
+                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-white font-semibold"
+                  onClick={confirmDelete}
+                >
+                  Supprimer
+                </button>
+                <button
+                  className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
+                  onClick={closeDeleteModal}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+      </section>
+
 
       {/* Contact Section */}
       <section id="contact" className="py-20 px-4 bg-gray-800/50">
@@ -738,49 +1269,228 @@ const clearSelections = () => {
             Contact
           </h2>
           <div className="grid md:grid-cols-2 gap-12">
-            <div>
+            <div >
               <h3 className="text-2xl font-semibold mb-6 text-blue-400">Restons en Contact</h3>
               <p className="text-gray-300 mb-8">
                 Intéressé par une collaboration ? N'hésitez pas à me contacter pour discuter de vos projets.
               </p>
               <div className="space-y-4">
-                {user?.email && (
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-blue-400 mr-3" />
-                    <a href={`mailto:${user.email}`} className="text-gray-300 hover:text-white transition-colors">
-                      {user.email}
-                    </a>
-                  </div>
-                )}
-                {user?.phone && (
-                  <div className="flex items-center">
-                    <Phone className="w-5 h-5 text-blue-400 mr-3" />
-                    <a href={`tel:${user.phone}`} className="text-gray-300 hover:text-white transition-colors">
-                      {user.phone}
-                    </a>
-                  </div>
-                )}
-                {user?.location && (
-                  <div className="flex items-center">
-                    <MapPin className="w-5 h-5 text-blue-400 mr-3" />
-                    <span className="text-gray-300">{user.location}</span>
-                  </div>
-                )}
+
+                {/* localisation */}
+
+                <div className="flex items-center relative group">
+                  <MapPin className="w-5 h-5 text-blue-400 mr-3" />
+                  {editingField === "location" ? (
+                    <>
+                      <input
+                        className="px-2 py-1 rounded bg-gray-800 text-white"
+                        value={editValue}
+                        autoFocus
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={saveEdit}
+                        disabled={savingEdit}
+                      />
+                      <button
+                        onClick={saveEdit}
+                        className="ml-2 text-green-500 font-bold"
+                        title="Valider"
+                      >✔</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-gray-300">{user.location}</span>
+                      <button
+                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
+                        onClick={() => startEdit("location", user.location)}
+                        title="Modifier la localisation"
+                        tabIndex={-1}
+                      >
+                        <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+
+                {/* telephone */}
+
+                <div className="flex items-center relative group">
+                  <Phone className="w-5 h-5 text-blue-400 mr-3" />
+                  {editingField === "phone" ? (
+                    <>
+                      <input
+                        className="px-2 py-1 rounded bg-gray-800 text-white"
+                        value={editValue}
+                        autoFocus
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={saveEdit}
+                        disabled={savingEdit}
+                      />
+                      <button
+                        onClick={saveEdit}
+                        className="ml-2 text-green-500 font-bold"
+                        title="Valider"
+                      >✔</button>
+                    </>
+                  ) : (
+                    <>
+                      <a href={`tel:${user.phone}`} className="text-gray-300 hover:text-white transition-colors">
+                        {user.phone}
+                      </a>
+                      <button
+                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
+                        onClick={() => startEdit("phone", user.phone)}
+                        title="Modifier le téléphone"
+                        tabIndex={-1}
+                      >
+                        <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+
+                {/* Email */}
+
+                
+                <div className="flex items-center relative group">
+                  <Mail className="w-5 h-5 text-blue-400 mr-3" />
+                  {editingField === "email" ? (
+                    <>
+                      <input
+                        className="px-2 py-1 rounded bg-gray-800 text-white"
+                        value={editValue}
+                        autoFocus
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={saveEdit}
+                        disabled={savingEdit}
+                      />
+                      <button
+                        onClick={saveEdit}
+                        className="ml-2 text-green-500 font-bold"
+                        title="Valider"
+                      >✔</button>
+                    </>
+                  ) : (
+                    <>
+                      <a href={`mailto:${user.email}`} className="text-gray-300 hover:text-white transition-colors">
+                        {user.email}
+                      </a>
+                      <button
+                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
+                        onClick={() => startEdit("email", user.email)}
+                        title="Modifier l'email"
+                        tabIndex={-1}
+                      >
+                        <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
               </div>
               <div className="flex space-x-4 mt-6">
-                {user?.github_url && (
-                  <a href={user.github_url} target="_blank" rel="noopener noreferrer"
-                    className="p-3 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors">
-                    <Github className="w-5 h-5" />
+                {/* Github */}
+                <div className="relative group inline-block">
+                  <a
+                    href={user.github_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors inline-flex items-center justify-center"
+                  >
+                    <Github className="w-5 h-5 text-white" />
                   </a>
-                )}
-                {user?.linkedin_url && (
-                  <a href={user.linkedin_url} target="_blank" rel="noopener noreferrer"
-                    className="p-3 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors">
-                    <Linkedin className="w-5 h-5" />
+                  <button
+                    className="absolute -top-2 -right-2 bg-gray-800 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                    onClick={() => startEdit("github_url", user.github_url)}
+                    title="Modifier Github"
+                    tabIndex={-1}
+                    style={{ zIndex: 10 }}
+                  >
+                    <Pencil className="w-3 h-3 text-blue-400 hover:text-blue-500" />
+                  </button>
+                  {editingField === "github_url" && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
+                      <input
+                        className="px-2 py-1 rounded bg-gray-900 text-white"
+                        value={editValue}
+                        autoFocus
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={saveEdit}
+                        onKeyDown={e => {
+                          if (e.key === "Escape") cancelEdit();
+                          if (e.key === "Enter") saveEdit();
+                        }}
+                        disabled={savingEdit}
+                        placeholder="Lien Github"
+                      />
+                      <button
+                        onClick={saveEdit}
+                        className="ml-2 text-green-500 font-bold"
+                        title="Valider"
+                        disabled={editValue === user.github_url || savingEdit}
+                      >✔</button>
+                      <button
+                        onClick={cancelEdit}
+                        className="ml-1 text-red-400 font-bold"
+                        title="Annuler"
+                        type="button"
+                      >✗</button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* LinkedIn */}
+                <div className="relative group inline-block">
+                  <a
+                    href={user.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors inline-flex items-center justify-center"
+                  >
+                    <Linkedin className="w-5 h-5 text-white" />
                   </a>
-                )}
+                  <button
+                    className="absolute -top-2 -right-2 bg-gray-800 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                    onClick={() => startEdit("linkedin_url", user.linkedin_url)}
+                    title="Modifier Linkedin"
+                    tabIndex={-1}
+                    style={{ zIndex: 10 }}
+                  >
+                    <Pencil className="w-3 h-3 text-blue-400 hover:text-blue-500" />
+                  </button>
+                  {editingField === "linkedin_url" && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
+                      <input
+                        className="px-2 py-1 rounded bg-gray-900 text-white"
+                        value={editValue}
+                        autoFocus
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={saveEdit}
+                        onKeyDown={e => {
+                          if (e.key === "Escape") cancelEdit();
+                          if (e.key === "Enter") saveEdit();
+                        }}
+                        disabled={savingEdit}
+                        placeholder="Lien Linkedin"
+                      />
+                      <button
+                        onClick={saveEdit}
+                        className="ml-2 text-green-500 font-bold"
+                        title="Valider"
+                        disabled={editValue === user.linkedin_url || savingEdit}
+                      >✔</button>
+                      <button
+                        onClick={cancelEdit}
+                        className="ml-1 text-red-400 font-bold"
+                        title="Annuler"
+                        type="button"
+                      >✗</button>
+                    </div>
+                  )}
+                </div>
               </div>
+
             </div>
             <div>
               <form onSubmit={handleContactSubmit} className="space-y-6">
