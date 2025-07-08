@@ -1,4 +1,5 @@
-// PortfolioPage.jsx - VERSION FINALE COMPLÈTE
+// PortfolioPage.js - MODIFICATIONS À APPORTER
+
 import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Portfolio from './Portfolio';
@@ -9,7 +10,7 @@ const PortfolioPage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fonction pour charger toutes les données
+  // Fonction pour charger toutes les données (MODIFIÉE pour inclure experiences)
   const loadData = async () => {
     try {
       setLoading(true);
@@ -66,7 +67,7 @@ const PortfolioPage = () => {
     }
   };
 
-  // Fonction pour mettre à jour les projets (pas utilisée mais nécessaire pour la compatibilité)
+  // Fonction pour mettre à jour les projets
   const updateProjects = (updatedProjects) => {
     setData(prevData => ({
       ...prevData,
@@ -74,11 +75,19 @@ const PortfolioPage = () => {
     }));
   };
 
-  // Fonction pour mettre à jour les compétences (pas utilisée mais nécessaire pour la compatibilité)
+  // Fonction pour mettre à jour les compétences
   const updateSkills = (updatedSkills) => {
     setData(prevData => ({
       ...prevData,
       skills: updatedSkills
+    }));
+  };
+
+  // NOUVELLE FONCTION pour mettre à jour les expériences
+  const updateExperiences = (updatedExperiences) => {
+    setData(prevData => ({
+      ...prevData,
+      experiences: updatedExperiences
     }));
   };
 
@@ -96,9 +105,11 @@ const PortfolioPage = () => {
       user={data.user} 
       projects={data.projects} 
       skills={data.skills}
+      experiences={data.experiences || []} // AJOUT avec fallback
       updateUser={updateUser}
       updateProjects={updateProjects}
       updateSkills={updateSkills}
+      updateExperiences={updateExperiences} // NOUVEAU
       loadData={loadData}
     />
   );

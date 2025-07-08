@@ -31,6 +31,9 @@ const FormPage = () => {
 
   const [skillsReference, setSkillsReference] = useState([]);
   
+  const [showExperienceForm, setShowExperienceForm] = useState(false);
+  const [editingExperience, setEditingExperience] = useState(null);
+  const [experiences, setExperiences] = useState([]); // Local pour les expériences
 
   // const skillOptions = Object.entries(
   // skillsReference.reduce((acc, s) => {
@@ -57,6 +60,42 @@ const FormPage = () => {
       .catch((e) => setError('Erreur de chargement'));
   }, []);
 
+  // Gère la suppression d'une expérience
+  const handleDeleteExperience = (experience) => {
+    if(window.confirm("Supprimer cette expérience ?")) {
+      setExperiences(experiences.filter(e => e !== experience));
+    }
+  };
+
+  // Ajout ou modification d'expérience
+  const handleSaveExperience = (data) => {
+    if(editingExperience) {
+      setExperiences(experiences.map(e => (e === editingExperience ? data : e)));
+    } else {
+      setExperiences([data, ...experiences]);
+    }
+    setEditingExperience(null);
+  };
+
+  // Fonctions utilitaires pour l'affichage
+  const formatDuration = (dateDebut, dateFin) => {
+    const debut = new Date(dateDebut);
+    const fin = dateFin ? new Date(dateFin) : new Date();
+    
+    const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
+    const moisFin = fin.getFullYear() * 12 + fin.getMonth();
+    const totalMois = moisFin - moisDebut + 1;
+    
+    const annees = Math.floor(totalMois / 12);
+    const mois = totalMois % 12;
+    
+    let duree = '';
+    if (annees > 0) duree += `${annees} an${annees > 1 ? 's' : ''}`;
+    if (mois > 0) duree += `${duree ? ' ' : ''}${mois} mois`;
+    
+    return duree || '1 mois';
+  };
+
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({
@@ -70,6 +109,7 @@ const FormPage = () => {
     setSaving(true);
     setError('');
     try {
+      // Créer l'utilisateur d'abord
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,18 +117,46 @@ const FormPage = () => {
       });
       const data = await res.json();
       if (!res.ok || !data.user) throw new Error(data.message || 'Erreur');
+      
+      const userId = data.user.id;
+      
+      // Ensuite créer les projets, compétences ET expériences
+      await Promise.all([
+        // Créer les projets
+        ...projects.map(project => 
+          fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...project, user_id: userId })
+          })
+        ),
+        // Créer les compétences
+        ...skills.map(skill => 
+          fetch('/api/skills', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...skill, user_id: userId })
+          })
+        ),
+        // NOUVEAU : Créer les expériences
+        ...experiences.map(experience => 
+          fetch('/api/experiences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...experience, user_id: userId })
+          })
+        )
+      ]);
+      
       setUsers([data.user, ...users]);
       setForm(initialForm);
+      setProjects([]); // Reset projets
+      setSkills([]);   // Reset compétences
+      setExperiences([]); // Reset expériences
       setShowForm(false);
       navigate(`/portfolio/${data.user.id}`);
     } catch (err) {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      setError(data.message || 'Erreur lors de la création de l’utilisateur');
+      setError(err.message || 'Erreur lors de la création du portfolio');
     } finally {
       setSaving(false);
     }
@@ -357,7 +425,68 @@ const FormPage = () => {
                 ))}
               </ul>
             </div>
-
+            
+            {/* Expériences Professionnelles */}
+            <div>
+              <div className="flex items-center mb-2">
+                <label className="block font-semibold text-green-300 text-lg">
+                  Expériences Professionnelles
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setShowExperienceForm(true); setEditingExperience(null); }}
+                  className="ml-2 text-green-400 hover:text-green-600"
+                  title="Ajouter une expérience"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+              <ul className="ml-4 space-y-2">
+                {experiences.length === 0 && <li className="text-gray-400 text-sm">Aucune expérience.</li>}
+                {experiences
+                  .sort((a, b) => new Date(b.dateDebut) - new Date(a.dateDebut))
+                  .map((exp, idx) => (
+                  <li key={idx} className="bg-gray-800/50 p-3 rounded border-l-2 border-green-400">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-green-300">{exp.entreprise}</span>
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                            {formatDuration(exp.dateDebut, exp.dateFin)}
+                          </span>
+                        </div>
+                        <div className="text-white/90 text-sm">{exp.poste}</div>
+                        <div className="text-gray-400 text-xs">
+                          {new Date(exp.dateDebut).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} - 
+                          {exp.dateFin ? new Date(exp.dateFin).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : 'Présent'}
+                        </div>
+                        {exp.description && (
+                          <div className="text-gray-300 text-xs mt-1 italic">{exp.description}</div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <button
+                          type="button"
+                          className="text-green-400 hover:text-green-500"
+                          onClick={() => { setShowExperienceForm(true); setEditingExperience(exp); }}
+                          title="Modifier"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="text-red-400 hover:text-red-600"
+                          onClick={() => handleDeleteExperience(exp)}
+                          title="Supprimer"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
             
             <div className="flex gap-4 mt-2">
               <button
@@ -394,6 +523,13 @@ const FormPage = () => {
             onSave={handleSaveSkill}
             initialData={editingSkill}
             skillsReference={skillsReference}
+          />
+        )}
+        {showExperienceForm && (
+          <ExperienceFormModal
+            onClose={() => { setShowExperienceForm(false); setEditingExperience(null); }}
+            onSave={handleSaveExperience}
+            initialData={editingExperience}
           />
         )}
 
@@ -735,6 +871,156 @@ function SkillFormModal({ onClose, onSave, initialData, skillsReference = [] }) 
           <button
             type="submit"
             className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white font-semibold"
+          >
+            {initialData ? 'Modifier' : 'Ajouter'}
+          </button>
+          <button
+            type="button"
+            className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
+            onClick={onClose}
+          >
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ExperienceFormModal({ onClose, onSave, initialData }) {
+  const [form, setForm] = useState(
+    initialData || { 
+      entreprise: '', 
+      poste: '', 
+      dateDebut: '', 
+      dateFin: '', 
+      description: '' 
+    }
+  );
+
+  useEffect(() => {
+    if (initialData) setForm(initialData);
+  }, [initialData]);
+
+  const formatDurationPreview = (dateDebut, dateFin) => {
+    if (!dateDebut) return '';
+    const debut = new Date(dateDebut);
+    const fin = dateFin ? new Date(dateFin) : new Date();
+    
+    const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
+    const moisFin = fin.getFullYear() * 12 + fin.getMonth();
+    const totalMois = moisFin - moisDebut + 1;
+    
+    const annees = Math.floor(totalMois / 12);
+    const mois = totalMois % 12;
+    
+    let duree = '';
+    if (annees > 0) duree += `${annees} an${annees > 1 ? 's' : ''}`;
+    if (mois > 0) duree += `${duree ? ' ' : ''}${mois} mois`;
+    
+    return duree || '1 mois';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <form
+        className="bg-gray-900 p-6 rounded-xl shadow-lg w-full max-w-md flex flex-col gap-3"
+        onSubmit={e => {
+          e.preventDefault();
+          if (!form.entreprise.trim() || !form.poste.trim() || !form.dateDebut) {
+            alert('Entreprise, poste et date de début sont obligatoires');
+            return;
+          }
+          onSave(form);
+          onClose();
+        }}
+      >
+        <h3 className="font-bold text-lg mb-2 text-green-300">
+          {initialData ? "Modifier l'expérience" : "Ajouter une expérience"}
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-green-300 mb-1">
+              Entreprise *
+            </label>
+            <input
+              className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
+              placeholder="Nom de l'entreprise"
+              value={form.entreprise}
+              onChange={e => setForm(f => ({ ...f, entreprise: e.target.value }))}
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-green-300 mb-1">
+              Poste *
+            </label>
+            <input
+              className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
+              placeholder="Votre fonction"
+              value={form.poste}
+              onChange={e => setForm(f => ({ ...f, poste: e.target.value }))}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-green-300 mb-1">
+              Date de début *
+            </label>
+            <input
+              type="month"
+              className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
+              value={form.dateDebut}
+              onChange={e => setForm(f => ({ ...f, dateDebut: e.target.value }))}
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-green-300 mb-1">
+              Date de fin
+            </label>
+            <input
+              type="month"
+              className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
+              value={form.dateFin}
+              onChange={e => setForm(f => ({ ...f, dateFin: e.target.value }))}
+            />
+            <p className="text-xs text-gray-500 mt-1">Laissez vide si c'est votre poste actuel</p>
+          </div>
+        </div>
+
+        {/* Aperçu de la durée */}
+        {form.dateDebut && (
+          <div className="text-center">
+            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+              Durée : {formatDurationPreview(form.dateDebut, form.dateFin)}
+            </span>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-green-300 mb-1">
+            Description
+          </label>
+          <textarea
+            className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-green-400"
+            rows="3"
+            placeholder="Décrivez vos responsabilités et réalisations..."
+            value={form.description}
+            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+          />
+        </div>
+
+        <div className="flex gap-4 mt-2">
+          <button
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white font-semibold"
           >
             {initialData ? 'Modifier' : 'Ajouter'}
           </button>

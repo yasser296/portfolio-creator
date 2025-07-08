@@ -9,7 +9,7 @@ import {
   ChevronDown, Mail, Phone, MapPin, Github, Linkedin, ExternalLink, Code, Palette, Server, Smartphone
 } from 'lucide-react';
 
-const Portfolio = ({ user, projects, skills, updateUser, loadData}) => {
+const Portfolio = ({ user, projects, skills, experiences, updateUser, loadData}) => {
   // Formulaire contact (local)
   const [activeSection, setActiveSection] = useState('hero');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -64,6 +64,73 @@ const [manualCategory, setManualCategory] = useState("");
 // const [manualSkill, setManualSkill] = useState("");
 const [isManualCategory, setIsManualCategory] = useState(false); // pour forcer le rendu
 
+const [showExperienceForm, setShowExperienceForm] = useState(false);
+const [editingExperience, setEditingExperience] = useState(null);
+const [experienceForm, setExperienceForm] = useState({
+  entreprise: "",
+  poste: "",
+  dateDebut: "",
+  dateFin: "",
+  description: "",
+});
+const [selectedExperienceId, setSelectedExperienceId] = useState(null);
+
+const formatDuration = (dateDebut, dateFin) => {
+  const debut = new Date(dateDebut);
+  const fin = dateFin ? new Date(dateFin) : new Date();
+  
+  const moisDebut = debut.getFullYear() * 12 + debut.getMonth();
+  const moisFin = fin.getFullYear() * 12 + fin.getMonth();
+  const totalMois = moisFin - moisDebut + 1;
+  
+  const annees = Math.floor(totalMois / 12);
+  const mois = totalMois % 12;
+  
+  let duree = '';
+  if (annees > 0) duree += `${annees} an${annees > 1 ? 's' : ''}`;
+  if (mois > 0) duree += `${duree ? ' ' : ''}${mois} mois`;
+  
+  return duree || '1 mois';
+};
+
+const formatDate = (date) => {
+  const d = new Date(date);
+  return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
+};
+
+// ==================== GESTION CRUD EXPÉRIENCES ====================
+async function handleExperienceSubmit(e) {
+  e.preventDefault();
+  setFormError("");
+  
+  if (!experienceForm.entreprise || !experienceForm.poste || !experienceForm.dateDebut) {
+    setFormError("Entreprise, poste et date de début obligatoires.");
+    return;
+  }
+  
+  try {
+    const url = editingExperience ? `/api/experiences/${editingExperience.id}` : "/api/experiences";
+    const method = editingExperience ? "PUT" : "POST";
+    const resp = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...experienceForm,
+        user_id: user.id,
+      }),
+    });
+    
+    if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+    
+    setShowExperienceForm(false);
+    setEditingExperience(null);
+    setSelectedExperienceId(null);
+    setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "" });
+    await loadData();
+  } catch (err) {
+    setFormError("Erreur : " + err.message);
+  }
+}
 
 useEffect(() => {
   fetch('/api/skills_reference')
@@ -100,6 +167,11 @@ async function confirmDelete() {
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       await loadData();
       setSelectedSkillId(null);
+    } else if (modalType === "experience") { // NOUVEAU CAS
+      const resp = await fetch(`/api/experiences/${modalTargetId}`, { method: "DELETE" });
+      if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+      await loadData();
+      setSelectedExperienceId(null);
     }
     closeDeleteModal();
   } catch (err) {
@@ -158,6 +230,7 @@ const handleEditKeyDown = (e) => {
 const clearSelections = () => {
   setSelectedSkillId(null);
   setSelectedProjectId(null);
+  setSelectedExperienceId(null);
 };  
 
   //   // Fonction loadData améliorée pour les projets et compétences
@@ -501,7 +574,7 @@ const techOptions = referenceSkills
             {/* Desktop Navigation */}
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
-                {['hero', 'about', 'skills', 'projects', 'contact'].map((section) => (
+                {['hero', 'about', 'skills', 'experiences', 'projects', 'contact'].map((section) => (
                   <button
                     key={section}
                     onClick={() => scrollToSection(section)}
@@ -511,7 +584,9 @@ const techOptions = referenceSkills
                         : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                     }`}
                   >
-                    {section === 'hero' ? 'Accueil' : section.charAt(0).toUpperCase() + section.slice(1)}
+                    {section === 'hero' ? 'Accueil' : 
+                    section === 'experiences' ? 'Expériences' : 
+                    section.charAt(0).toUpperCase() + section.slice(1)}
                   </button>
                 ))}
               </div>
@@ -971,7 +1046,211 @@ const techOptions = referenceSkills
       </section>
 
 
+      {/* AJOUT : Experiences Section - À placer entre la section skills et projects */}
+      <section id="experiences" className="py-20 px-4" onClick={clearSelections}>
+        <div className="flex gap-4 justify-end mb-6">
+          <button
+            onClick={e => { 
+              e.stopPropagation(); 
+              setShowExperienceForm(true); 
+              setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "", id: null });
+              setFormError("");
+            }}
+            className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold shadow"
+          >
+            + Ajouter une expérience
+          </button>
+          <button
+            disabled={!selectedExperienceId}
+            onClick={e => {
+              e.stopPropagation();
+              const exp = experiences.find(ex => ex.id === selectedExperienceId);
+              if (exp) {
+                setExperienceForm({
+                  ...exp,
+                  id: exp.id
+                });
+                setShowExperienceForm(true);
+                setFormError("");
+              }
+            }}
+            className={`px-4 py-2 rounded font-semibold shadow
+              ${selectedExperienceId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
+          >
+            Modifier l'expérience
+          </button>
+        </div>
 
+        {showExperienceForm && (
+          <form
+            className="bg-gray-900 p-6 rounded-xl mb-6 shadow-lg max-w-xl mx-auto flex flex-col gap-3"
+            onSubmit={handleExperienceSubmit}
+          >
+            <h3 className="font-bold text-lg mb-2 text-green-300">
+              {experienceForm.id ? "Modifier l'expérience" : "Nouvelle expérience"}
+            </h3>
+            {formError && <div className="text-red-400 mb-2">{formError}</div>}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-green-300 mb-1">
+                  Entreprise *
+                </label>
+                <input
+                  type="text"
+                  className="px-3 py-2 rounded bg-gray-800 text-white w-full"
+                  placeholder="Nom de l'entreprise"
+                  value={experienceForm.entreprise}
+                  onChange={e => setExperienceForm(f => ({ ...f, entreprise: e.target.value }))}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-green-300 mb-1">
+                  Poste *
+                </label>
+                <input
+                  type="text"
+                  className="px-3 py-2 rounded bg-gray-800 text-white w-full"
+                  placeholder="Votre fonction"
+                  value={experienceForm.poste}
+                  onChange={e => setExperienceForm(f => ({ ...f, poste: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-green-300 mb-1">
+                  Date de début *
+                </label>
+                <input
+                  type="month"
+                  className="px-3 py-2 rounded bg-gray-800 text-white w-full"
+                  value={experienceForm.dateDebut}
+                  onChange={e => setExperienceForm(f => ({ ...f, dateDebut: e.target.value }))}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-green-300 mb-1">
+                  Date de fin
+                </label>
+                <input
+                  type="month"
+                  className="px-3 py-2 rounded bg-gray-800 text-white w-full"
+                  value={experienceForm.dateFin}
+                  onChange={e => setExperienceForm(f => ({ ...f, dateFin: e.target.value }))}
+                />
+                <p className="text-xs text-gray-500 mt-1">Laissez vide si c'est votre poste actuel</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-green-300 mb-1">
+                Description
+              </label>
+              <textarea
+                className="px-3 py-2 rounded bg-gray-800 text-white w-full"
+                rows="3"
+                placeholder="Décrivez vos responsabilités et réalisations..."
+                value={experienceForm.description}
+                onChange={e => setExperienceForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex gap-4 mt-2">
+              <button
+                type="submit"
+                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white font-semibold"
+              >
+                {experienceForm.id ? "Modifier" : "Ajouter"}
+              </button>
+              <button
+                type="button"
+                className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
+                onClick={() => { 
+                  setShowExperienceForm(false); 
+                  setExperienceForm({ entreprise: "", poste: "", dateDebut: "", dateFin: "", description: "", id: null }); 
+                  setEditingExperience(null); 
+                }}
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            Expériences Professionnelles
+          </h2>
+          
+          {experiences && experiences.length > 0 ? (
+            <div className="space-y-6">
+              {experiences
+                .sort((a, b) => new Date(b.dateDebut) - new Date(a.dateDebut)) // Tri par date décroissante
+                .map(experience => (
+                <div
+                  key={experience.id}
+                  onClick={e => { e.stopPropagation(); setSelectedExperienceId(experience.id); }}
+                  tabIndex={0}
+                  className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-all duration-300 border-2 cursor-pointer group
+                    ${selectedExperienceId === experience.id ? "border-yellow-400" : "border-transparent"}`}
+                >
+                  {/* Bouton X de suppression */}
+                  <button
+                    type="button"
+                    className="absolute top-2 right-2 bg-green-700 hover:bg-green-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
+                    title="Supprimer cette expérience"
+                    onClick={e => { e.stopPropagation(); openDeleteModal("experience", experience.id); }}
+                    tabIndex={-1}
+                  >
+                    ×
+                  </button>
+
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">🏢</span>
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-100">{experience.entreprise}</h3>
+                      </div>
+                      <h4 className="text-lg font-medium text-green-400 mb-3">{experience.poste}</h4>
+                      
+                      <div className="flex items-center gap-2 text-gray-400 mb-3">
+                        <span className="text-sm">📅</span>
+                        <span className="text-sm">
+                          {formatDate(experience.dateDebut)} - {experience.dateFin ? formatDate(experience.dateFin) : 'Présent'}
+                        </span>
+                        <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                          {formatDuration(experience.dateDebut, experience.dateFin)}
+                        </span>
+                      </div>
+                      
+                      {experience.description && (
+                        <p className="text-gray-300 leading-relaxed">{experience.description}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 bg-green-500/20 rounded-full flex items-center justify-center">
+                <span className="text-3xl">💼</span>
+              </div>
+              <p className="text-gray-400 text-lg">Aucune expérience professionnelle ajoutée.</p>
+              <p className="text-gray-500 text-sm">Cliquez sur "Ajouter une expérience" pour commencer</p>
+            </div>
+          )}
+        </div>
+      </section>
       
 
       {/* Projects Section */}
@@ -1238,7 +1517,9 @@ const techOptions = referenceSkills
               <p className="text-gray-300 mb-6">
                 {modalType === "project"
                   ? "Voulez-vous vraiment supprimer ce projet ? Cette action est irréversible."
-                  : "Voulez-vous vraiment supprimer cette compétence ? Cette action est irréversible."}
+                  : modalType === "skill"
+                  ? "Voulez-vous vraiment supprimer cette compétence ? Cette action est irréversible."
+                  : "Voulez-vous vraiment supprimer cette expérience ? Cette action est irréversible."}
               </p>
               <div className="flex gap-4 justify-center">
                 <button

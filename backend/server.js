@@ -442,49 +442,49 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// 2) Récupérer un user + ses projects & skills
+// GET /api/users/:id - MODIFIER la route existante pour inclure les expériences
 app.get('/api/users/:id', async (req, res) => {
   try {
-    const userId = req.params.id;
-    const u = await pool.query(
-      `SELECT * FROM users WHERE id = $1 AND is_active = true`,
-      [userId]
-    );
-    if (u.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'User non trouvé' });
+    const { id } = req.params;
+    
+    // Récupérer l'utilisateur
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (userResult.rows.length === 0) {
+      return res.json({ success: false, message: 'Utilisateur non trouvé' });
     }
-    const user = u.rows[0];
-
-    const p = await pool.query(`
-      SELECT id, title, description, technologies, image_url,
-             github_url, demo_url, featured, view_count
-      FROM projects
-      WHERE user_id = $1 AND is_active = true
-      ORDER BY created_at DESC
-    `, [userId]);
-
-    const s = await pool.query(`
-      SELECT id, category, items, icon_name, display_order
-      FROM skills
-      WHERE user_id = $1 AND is_active = true
-      ORDER BY display_order, category
-    `, [userId]);
-
-    const projects = p.rows.map(pr => ({
-      ...pr,
-      technologies: pr.technologies || []
-    }));
-    const skills = s.rows.map(sk => ({
-      ...sk,
-      items: sk.items || []
-    }));
-
-    res.json({ user, projects, skills });
-  } catch (err) {
-    console.error(`Erreur /api/users/${req.params.id}:`, err);
-    res.status(500).json({ success: false, message: 'Erreur récupération user' });
+    
+    // Récupérer les projets
+    const projectsResult = await pool.query(
+      'SELECT * FROM projects WHERE user_id = $1 ORDER BY created_at DESC', 
+      [id]
+    );
+    
+    // Récupérer les compétences
+    const skillsResult = await pool.query(
+      'SELECT * FROM skills WHERE user_id = $1 ORDER BY category', 
+      [id]
+    );
+    
+    // NOUVEAU : Récupérer les expériences
+    const experiencesResult = await pool.query(
+      'SELECT * FROM experiences WHERE user_id = $1 ORDER BY date_debut DESC', 
+      [id]
+    );
+    
+    res.json({
+      user: userResult.rows[0],
+      projects: projectsResult.rows,
+      skills: skillsResult.rows,
+      experiences: experiencesResult.rows // AJOUT
+    });
+    
+  } catch (error) {
+    console.error('Erreur:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
+
+
 
 // Supprimer un utilisateur/portfolio par ID
 app.delete('/api/users/:id', async (req, res) => {
@@ -862,7 +862,7 @@ app.post('/api/users', async (req, res) => {
     }
 
     // 3) Insertion en base avec RETURNING *
-    const result = await pool.query(
+     const result = await pool.query(
       `INSERT INTO users
         (name, email, title, description, experience_years, location, phone,
          github_url, linkedin_url, personal_website, avatar_url, hero_background,
@@ -901,12 +901,127 @@ app.post('/api/users', async (req, res) => {
   } catch (error) {
     console.error('Erreur création user:', error);
     // Cas où c’est une violation d’unicité sur l’email (code postgres 23505)
-    if (err.code === "23505" && err.constraint === "users_email_key") {
-      return res.status(400).json({ message: "Cet email existe déjà." });
+    if (error.code === "23505" && error.constraint === "users_email_key") {
+      return res.status(400).json({ 
+        success: false,
+        message: "Cet email existe déjà." 
+      });
     }
     // Autres erreurs : ne pas exposer le détail technique
-    console.error('Erreur création user:', err); // On log pour debug interne
-    return res.status(500).json({ message: "Erreur serveur. Veuillez réessayer plus tard." });
+    console.error('Erreur détaillée:', error.message);
+    return res.status(500).json({ 
+      success: false,
+      message: "Erreur serveur. Veuillez réessayer plus tard." 
+    });
+  }
+});
+
+// POST /api/experiences - Créer une nouvelle expérience
+app.post('/api/experiences', async (req, res) => {
+  try {
+    const { user_id, entreprise, poste, dateDebut, dateFin, description } = req.body;
+    
+    // Validation
+    if (!user_id || !entreprise || !poste || !dateDebut) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'user_id, entreprise, poste et dateDebut sont obligatoires' 
+      });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO experiences (user_id, entreprise, poste, date_debut, date_fin, description) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING *`,
+      [user_id, entreprise, poste, dateDebut, dateFin || null, description || '']
+    );
+    
+    res.status(201).json({
+      success: true,
+      experience: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Erreur création expérience:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/experiences/:id - Modifier une expérience
+app.put('/api/experiences/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { entreprise, poste, dateDebut, dateFin, description } = req.body;
+    
+    // Validation
+    if (!entreprise || !poste || !dateDebut) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'entreprise, poste et dateDebut sont obligatoires' 
+      });
+    }
+    
+    const result = await pool.query(
+      `UPDATE experiences 
+       SET entreprise = $1, poste = $2, date_debut = $3, date_fin = $4, 
+           description = $5, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $6 
+       RETURNING *`,
+      [entreprise, poste, dateDebut, dateFin || null, description || '', id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Expérience non trouvée' });
+    }
+    
+    res.json({
+      success: true,
+      experience: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Erreur modification expérience:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/experiences/:id - Supprimer une expérience
+app.delete('/api/experiences/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query('DELETE FROM experiences WHERE id = $1 RETURNING *', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Expérience non trouvée' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Expérience supprimée avec succès'
+    });
+    
+  } catch (error) {
+    console.error('Erreur suppression expérience:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/users/:id/experiences - Récupérer toutes les expériences d'un utilisateur
+app.get('/api/users/:id/experiences', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'SELECT * FROM experiences WHERE user_id = $1 ORDER BY date_debut DESC', 
+      [id]
+    );
+    
+    res.json(result.rows);
+    
+  } catch (error) {
+    console.error('Erreur récupération expériences:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
 
