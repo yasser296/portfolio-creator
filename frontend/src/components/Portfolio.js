@@ -657,36 +657,64 @@ async function handleProjectSubmit(e) {
 async function handleSkillSubmit(e) {
   e.preventDefault();
   setFormError("");
+
   const finalCategory = isManualCategory ? manualCategory : skillForm.category;
 
   if (!finalCategory.trim() || !skillForm.items.trim()) {
     setFormError("Catégorie et compétences obligatoires.");
     return;
   }
+
   try {
-    const url = editingSkill ? `/api/skills/${editingSkill.id}` : "/api/skills";
-    const method = editingSkill ? "PUT" : "POST";
-    const resp = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    // Trouve si la catégorie existe déjà dans les compétences actuelles
+    const existingSkill = skills.find(skill => skill.category.toLowerCase() === finalCategory.toLowerCase());
+
+    const newItems = skillForm.items.split(",").map(s => s.trim());
+
+    let url, method, body;
+
+    if (existingSkill && !skillForm.id) {
+      // Cas où la catégorie existe déjà, fusionner avec compétences existantes
+      const mergedItems = [...new Set([...existingSkill.items, ...newItems])];
+
+      url = `/api/skills/${existingSkill.id}`;
+      method = "PUT";
+      body = {
+        ...existingSkill,
+        items: mergedItems,
+        user_id: user.id,
+      };
+    } else {
+      // Cas d'une modification ou ajout d'une nouvelle catégorie
+      url = skillForm.id ? `/api/skills/${skillForm.id}` : "/api/skills";
+      method = skillForm.id ? "PUT" : "POST";
+      body = {
         ...skillForm,
         category: finalCategory,
         user_id: user.id,
-        items: skillForm.items.split(",").map(s => s.trim()),
-      }),
+        items: newItems,
+      };
+    }
+
+    const resp = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
+
     if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
 
     const result = await resp.json();
-    
-    // 🚀 MISE À JOUR OPTIMISTE
-    if (editingSkill) {
-      const updatedSkills = skills.map(s => s.id === editingSkill.id ? result.skill : s);
-      if (updateSkills) updateSkills(updatedSkills);
+
+    // Mise à jour optimiste
+    if (existingSkill && !skillForm.id) {
+      const updatedSkills = skills.map(s => s.id === existingSkill.id ? result.skill : s);
+      updateSkills(updatedSkills);
+    } else if (skillForm.id) {
+      const updatedSkills = skills.map(s => s.id === skillForm.id ? result.skill : s);
+      updateSkills(updatedSkills);
     } else {
-      const updatedSkills = [...skills, result.skill];
-      if (updateSkills) updateSkills(updatedSkills);
+      updateSkills([...skills, result.skill]);
     }
 
     setShowSkillForm(false);
@@ -695,10 +723,12 @@ async function handleSkillSubmit(e) {
     setSkillForm({ category: "", items: "", icon_name: "" });
     setManualCategory("");
     setIsManualCategory(false);
+
   } catch (err) {
     setFormError("Erreur : " + err.message);
   }
 }
+
 
 
 

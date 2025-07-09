@@ -129,10 +129,27 @@ app.get('/api/skills', async (req, res) => {
     `);
     
     // Parser les items JSON
-    const skills = result.rows.map(skill => ({
+    const skills = result.rows.map(skill => {
+    let parsedItems;
+
+    if (Array.isArray(skill.items)) {
+      parsedItems = skill.items;
+    } else {
+      try {
+        parsedItems = JSON.parse(skill.items);
+        if (!Array.isArray(parsedItems)) {
+          throw new Error();
+        }
+      } catch {
+        parsedItems = skill.items.split(',').map(item => item.trim());
+      }
+    }
+
+    return {
       ...skill,
-      items: Array.isArray(skill.items) ? skill.items : JSON.parse(skill.items || '[]')
-    }));
+      items: parsedItems
+    };
+  });
     
     res.json(skills);
   } catch (error) {
@@ -669,10 +686,12 @@ app.put('/api/skills/:id', async (req, res) => {
         message: 'Compétence non trouvée' 
       });
     }
-    
+
     const skill = {
       ...result.rows[0],
-      items: JSON.parse(result.rows[0].items || '[]')
+      items: Array.isArray(result.rows[0].items)
+        ? result.rows[0].items
+        : JSON.parse(result.rows[0].items || '[]')
     };
     
     res.json({ 
@@ -688,6 +707,9 @@ app.put('/api/skills/:id', async (req, res) => {
     });
   }
 });
+
+
+
 
 // Route pour supprimer un projet
 app.delete('/api/projects/:id', async (req, res) => {
