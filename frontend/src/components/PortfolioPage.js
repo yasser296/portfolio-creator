@@ -18,9 +18,12 @@ const PortfolioPage = () => {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   // 🚀 FONCTION LOADDATA OPTIMISÉE AVEC OPTION FORCE RELOAD
   const loadData = async (forceReload = false) => {
+    
+    
     try {
       setLoading(true);
       
@@ -34,7 +37,7 @@ const PortfolioPage = () => {
       
       // Sinon charger depuis le serveur
       console.log('🌐 Chargement depuis le serveur...');
-      const response = await fetch(`/api/users/${id}`);
+      const response = await fetch(`${API_URL}/api/users/${id}`);
       const result = await response.json();
       
       if (result.success === false) {
@@ -73,7 +76,7 @@ const PortfolioPage = () => {
     }));
 
     try {
-      const response = await authFetch(`/api/users/${id}`, {
+      const response = await authFetch(`${API_URL}/api/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedFields)

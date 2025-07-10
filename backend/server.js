@@ -15,7 +15,7 @@ const {
   verifyPassword 
 } = require('./auth');
 
-// Configuration PostgreSQL
+// Configuration PostgreSQL local
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 5432,
@@ -25,6 +25,12 @@ const pool = new Pool({
   ssl: false
 });
 
+// const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+//   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+// });
+
+
 // Test de connexion au démarrage
 pool.connect()
   .then(() => console.log('✅ Connexion PostgreSQL établie'))
@@ -33,7 +39,9 @@ pool.connect()
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

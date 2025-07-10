@@ -14,10 +14,10 @@ const Dashboard = () => {
   
   const userStr = localStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
-  
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   useEffect(() => {
     // Charger la liste des portfolios
-    fetch('/api/users')
+    fetch(`${API_URL}/api/users`)
       .then(res => res.json())
       .then(data => {
         setPortfolios(data);

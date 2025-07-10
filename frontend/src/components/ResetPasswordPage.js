@@ -18,7 +18,7 @@ const ResetPasswordPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [tokenValid, setTokenValid] = useState(null);
-
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   // Vérifier si le token est valide
   useEffect(() => {
     if (!token) {
@@ -30,7 +30,7 @@ const ResetPasswordPage = () => {
     // Optionnel : Vérifier le token côté serveur
     const checkToken = async () => {
       try {
-        const response = await fetch('/api/auth/verify-reset-token', {
+        const response = await fetch(`${API_URL}/api/auth/verify-reset-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
@@ -84,7 +84,7 @@ const ResetPasswordPage = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
+      const response = await fetch(`${API_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

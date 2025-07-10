@@ -441,9 +441,9 @@ const RegisterPage = () => {
   
   // Référence des compétences
   const [skillsReference, setSkillsReference] = useState([]);
-
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   useEffect(() => {
-    fetch('/api/skills_reference')
+    fetch(`${API_URL}/api/skills_reference`)
       .then(res => res.json())
       .then(data => setSkillsReference(data))
       .catch(() => setSkillsReference([]));
@@ -574,7 +574,7 @@ const RegisterPage = () => {
       const { confirmPassword, ...dataToSend } = formData;
       
       // 1. Créer l'utilisateur via l'authentification
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -599,7 +599,7 @@ const RegisterPage = () => {
           await Promise.all([
             // Créer les projets
             ...projects.map(project => 
-              fetch('/api/projects', {
+              fetch(`${API_URL}/api/projects`, {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',
@@ -616,7 +616,7 @@ const RegisterPage = () => {
             ),
             // Créer les compétences
             ...skills.map(skill => 
-              fetch('/api/skills', {
+              fetch(`${API_URL}/api/skills`, {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',
@@ -631,7 +631,7 @@ const RegisterPage = () => {
             ),
             // Créer les expériences
             ...experiences.map(experience => 
-              fetch('/api/experiences', {
+              fetch(`${API_URL}/api/experiences`, {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',

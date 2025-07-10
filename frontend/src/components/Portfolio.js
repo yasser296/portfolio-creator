@@ -315,9 +315,10 @@ async function handleExperienceSubmit(e) {
     setFormError("Entreprise, poste et date de début obligatoires.");
     return;
   }
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   
   try {
-    const url = editingExperience ? `/api/experiences/${editingExperience.id}` : "/api/experiences";
+    const url = editingExperience ? `${API_URL}/api/experiences/${editingExperience.id}` : "/api/experiences";
     const method = editingExperience ? "PUT" : "POST";
     const resp = await authFetch(url, {
       method,
@@ -349,9 +350,10 @@ async function handleExperienceSubmit(e) {
     setFormError("Erreur : " + err.message);
   }
 }
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 useEffect(() => {
-  authFetch('/api/skills_reference')
+  authFetch(`${API_URL}/api/skills_reference`)
     .then(res => res.json())
     .then(data => {
       setReferenceSkills(Array.isArray(data) ? data : []);
@@ -374,9 +376,10 @@ function closeDeleteModal() {
 
 // Handler global pour la suppression selon le type :
 async function confirmDelete() {
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   try {
     if (modalType === "project") {
-      const resp = await authFetch(`/api/projects/${modalTargetId}`, { method: "DELETE" });
+      const resp = await authFetch(`${API_URL}/api/projects/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       
       // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate du projet
@@ -385,7 +388,7 @@ async function confirmDelete() {
       
       setSelectedProjectId(null);
     } else if (modalType === "skill") {
-      const resp = await authFetch(`/api/skills/${modalTargetId}`, { method: "DELETE" });
+      const resp = await authFetch(`${API_URL}/api/skills/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       
       // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate de la compétence
@@ -394,7 +397,7 @@ async function confirmDelete() {
       
       setSelectedSkillId(null);
     } else if (modalType === "experience") {
-      const resp = await authFetch(`/api/experiences/${modalTargetId}`, { method: "DELETE" });
+      const resp = await authFetch(`${API_URL}/api/experiences/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       
       // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate de l'expérience
@@ -611,6 +614,7 @@ const clearSelections = () => {
 
 // Pour valider l'ajout/la modification d'un projet
 async function handleProjectSubmit(e) {
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   e.preventDefault();
   setFormError("");
   if (!projectForm.title || !projectForm.description) {
@@ -618,7 +622,7 @@ async function handleProjectSubmit(e) {
     return;
   }
   try {
-    const url = editingProject ? `/api/projects/${editingProject.id}` : "/api/projects";
+    const url = editingProject ? `${API_URL}/api/projects/${editingProject.id}` : "/api/projects";
     const method = editingProject ? "PUT" : "POST";
     const resp = await authFetch(url, {
       method,
@@ -671,14 +675,14 @@ async function handleSkillSubmit(e) {
     const existingSkill = skills.find(skill => skill.category.toLowerCase() === finalCategory.toLowerCase());
 
     const newItems = skillForm.items.split(",").map(s => s.trim());
-
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
     let url, method, body;
 
     if (existingSkill && !skillForm.id) {
       // Cas où la catégorie existe déjà, fusionner avec compétences existantes
       const mergedItems = [...new Set([...existingSkill.items, ...newItems])];
 
-      url = `/api/skills/${existingSkill.id}`;
+      url = `${API_URL}/api/skills/${existingSkill.id}`;
       method = "PUT";
       body = {
         ...existingSkill,
@@ -744,11 +748,12 @@ async function handleSkillSubmit(e) {
 
   // Gérer l'envoi du formulaire de contact
   const handleContactSubmit = async (e) => {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
     e.preventDefault();
     setSubmitStatus({ loading: true, message: '', type: '' });
 
     try {
-      const response = await authFetch('/api/contact', {
+      const response = await authFetch(`${API_URL}/api/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -767,7 +772,7 @@ async function handleSkillSubmit(e) {
         setContactForm({ name: '', email: '', message: '' });
         
         // Recharger les stats pour mettre à jour le compteur de clients
-        const newStats = await fetchAPI('/stats');
+        const newStats = await fetchAPI(`${API_URL}/stats`);
         setStats(newStats);
       } else {
         setSubmitStatus({
