@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Pencil } from 'lucide-react';  
 import CreatableSelect from 'react-select/creatable';
 
-
+import { isPortfolioOwner, authFetch } from '../utils/auth';
+import { AuthGuard } from '../components/AuthGuard';
 
 import {
   ChevronDown, Mail, Phone, MapPin, Github, Linkedin, ExternalLink, Code, Palette, Server, Smartphone
@@ -318,7 +319,7 @@ async function handleExperienceSubmit(e) {
   try {
     const url = editingExperience ? `/api/experiences/${editingExperience.id}` : "/api/experiences";
     const method = editingExperience ? "PUT" : "POST";
-    const resp = await fetch(url, {
+    const resp = await authFetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -350,7 +351,7 @@ async function handleExperienceSubmit(e) {
 }
 
 useEffect(() => {
-  fetch('/api/skills_reference')
+  authFetch('/api/skills_reference')
     .then(res => res.json())
     .then(data => {
       setReferenceSkills(Array.isArray(data) ? data : []);
@@ -375,7 +376,7 @@ function closeDeleteModal() {
 async function confirmDelete() {
   try {
     if (modalType === "project") {
-      const resp = await fetch(`/api/projects/${modalTargetId}`, { method: "DELETE" });
+      const resp = await authFetch(`/api/projects/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       
       // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate du projet
@@ -384,7 +385,7 @@ async function confirmDelete() {
       
       setSelectedProjectId(null);
     } else if (modalType === "skill") {
-      const resp = await fetch(`/api/skills/${modalTargetId}`, { method: "DELETE" });
+      const resp = await authFetch(`/api/skills/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       
       // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate de la compétence
@@ -393,7 +394,7 @@ async function confirmDelete() {
       
       setSelectedSkillId(null);
     } else if (modalType === "experience") {
-      const resp = await fetch(`/api/experiences/${modalTargetId}`, { method: "DELETE" });
+      const resp = await authFetch(`/api/experiences/${modalTargetId}`, { method: "DELETE" });
       if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
       
       // 🚀 MISE À JOUR OPTIMISTE - suppression immédiate de l'expérience
@@ -532,7 +533,7 @@ const clearSelections = () => {
    // Fonction pour faire des appels API
   const fetchAPI = async (endpoint) => {
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`);
+      const response = await authFetch(`${API_BASE}${endpoint}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -619,7 +620,7 @@ async function handleProjectSubmit(e) {
   try {
     const url = editingProject ? `/api/projects/${editingProject.id}` : "/api/projects";
     const method = editingProject ? "PUT" : "POST";
-    const resp = await fetch(url, {
+    const resp = await authFetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -696,7 +697,7 @@ async function handleSkillSubmit(e) {
       };
     }
 
-    const resp = await fetch(url, {
+    const resp = await authFetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -747,7 +748,7 @@ async function handleSkillSubmit(e) {
     setSubmitStatus({ loading: true, message: '', type: '' });
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await authFetch('/api/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -925,50 +926,54 @@ const techOptions = referenceSkills
             {/* Nom */}
 
             <div className="font-bold text-4xl md:text-5xl mb-2">
-              {editingField === "name" ? (
-                <input
-                  className="px-2 py-1 rounded bg-gray-800 text-white"
-                  value={editValue}
-                  autoFocus
-                  onChange={e => setEditValue(e.target.value)}
-                  onBlur={saveEdit}
-                  onKeyDown={handleEditKeyDown}
-                  disabled={savingEdit}
-                />
-              ) : (
-                <span
-                  className="cursor-pointer hover:underline"
-                  title="Modifier le nom"
-                  onClick={() => startEdit("name", user.name)}
-                >
-                  {user.name}
-                </span>
-              )}
+              <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                {editingField === "name" ? (
+                  <input
+                    className="px-2 py-1 rounded bg-gray-800 text-white"
+                    value={editValue}
+                    autoFocus
+                    onChange={e => setEditValue(e.target.value)}
+                    onBlur={saveEdit}
+                    onKeyDown={handleEditKeyDown}
+                    disabled={savingEdit}
+                  />
+                ) : (
+                  <span
+                    className="cursor-pointer hover:underline"
+                    title="Modifier le nom"
+                    onClick={() => startEdit("name", user.name)}
+                  >
+                    {user.name}
+                  </span>
+                )}
+              </AuthGuard>
             </div>
 
             {/* Titre */}
 
 
             <div className="text-blue-400 mb-2">
-              {editingField === "title" ? (
-                <input
-                  className="px-2 py-1 rounded bg-gray-800 text-white"
-                  value={editValue}
-                  autoFocus
-                  onChange={e => setEditValue(e.target.value)}
-                  onBlur={saveEdit}
-                  onKeyDown={handleEditKeyDown}
-                  disabled={savingEdit}
-                />
-              ) : (
-                <span
-                  className="cursor-pointer hover:underline"
-                  title="Modifier le titre"
-                  onClick={() => startEdit("title", user.title)}
-                >
-                  {user.title}
-                </span>
-              )}
+              <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                {editingField === "title" ? (
+                  <input
+                    className="px-2 py-1 rounded bg-gray-800 text-white"
+                    value={editValue}
+                    autoFocus
+                    onChange={e => setEditValue(e.target.value)}
+                    onBlur={saveEdit}
+                    onKeyDown={handleEditKeyDown}
+                    disabled={savingEdit}
+                  />
+                ) : (
+                  <span
+                    className="cursor-pointer hover:underline"
+                    title="Modifier le titre"
+                    onClick={() => startEdit("title", user.title)}
+                  >
+                    {user.title}
+                  </span>
+                )}
+              </AuthGuard>
             </div>
 
 
@@ -1013,26 +1018,28 @@ const techOptions = referenceSkills
                 {/* Description */}
 
               <div className="text-gray-300 mb-4">
-                {editingField === "description" ? (
-                  <textarea
-                    className="px-2 py-1 rounded bg-gray-800 text-white w-full"
-                    value={editValue}
-                    autoFocus
-                    onChange={e => setEditValue(e.target.value)}
-                    onBlur={saveEdit}
-                    onKeyDown={handleEditKeyDown}
-                    disabled={savingEdit}
-                    rows={3}
-                  />
-                ) : (
-                  <span
-                    className="cursor-pointer hover:underline"
-                    title="Modifier la description"
-                    onClick={() => startEdit("description", user.description)}
-                  >
-                    {user.description}
-                  </span>
-                )}
+                <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                  {editingField === "description" ? (
+                    <textarea
+                      className="px-2 py-1 rounded bg-gray-800 text-white w-full"
+                      value={editValue}
+                      autoFocus
+                      onChange={e => setEditValue(e.target.value)}
+                      onBlur={saveEdit}
+                      onKeyDown={handleEditKeyDown}
+                      disabled={savingEdit}
+                      rows={3}
+                    />
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:underline"
+                      title="Modifier la description"
+                      onClick={() => startEdit("description", user.description)}
+                    >
+                      {user.description}
+                    </span>
+                  )}
+                </AuthGuard>
               </div>
 
 
@@ -1089,34 +1096,36 @@ const techOptions = referenceSkills
 
       {/* Skills Section */}
       <section id="skills" className="py-20 px-4 bg-gray-800/50" onClick={clearSelections}>
-        <div className="flex gap-4 justify-end mb-6">
-          <button
-            onClick={e => { e.stopPropagation(); setShowSkillForm(true); setSkillForm({ category: "", items: "", icon_name: "", id: null }); setFormError(""); }}
-            className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow"
-          >
-            + Ajouter une compétence
-          </button>
-          <button
-            disabled={!selectedSkillId}
-            onClick={e => {
-              e.stopPropagation();
-              const skill = skills.find(sk => sk.id === selectedSkillId);
-              if (skill) {
-                setSkillForm({
-                  ...skill,
-                  items: Array.isArray(skill.items) ? skill.items.join(", ") : skill.items || "",
-                  id: skill.id
-                });
-                setShowSkillForm(true);
-                setFormError("");
-              }
-            }}
-            className={`px-4 py-2 rounded font-semibold shadow
-              ${selectedSkillId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
-          >
-            Modifier la compétence
-          </button>
-        </div>
+        <AuthGuard portfolioUserId={user.id}>
+          <div className="flex gap-4 justify-end mb-6">
+            <button
+              onClick={e => { e.stopPropagation(); setShowSkillForm(true); setSkillForm({ category: "", items: "", icon_name: "", id: null }); setFormError(""); }}
+              className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow"
+            >
+              + Ajouter une compétence
+            </button>
+            <button
+              disabled={!selectedSkillId}
+              onClick={e => {
+                e.stopPropagation();
+                const skill = skills.find(sk => sk.id === selectedSkillId);
+                if (skill) {
+                  setSkillForm({
+                    ...skill,
+                    items: Array.isArray(skill.items) ? skill.items.join(", ") : skill.items || "",
+                    id: skill.id
+                  });
+                  setShowSkillForm(true);
+                  setFormError("");
+                }
+              }}
+              className={`px-4 py-2 rounded font-semibold shadow
+                ${selectedSkillId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
+            >
+              Modifier la compétence
+            </button>
+          </div>
+        </AuthGuard>
 
         {showSkillForm && (
           <form
@@ -1303,40 +1312,42 @@ const techOptions = referenceSkills
 
       {/* AJOUT : Experiences Section - À placer entre la section skills et projects */}
       <section id="experiences" className="py-20 px-4" onClick={clearSelections}>
-        <div className="flex gap-4 justify-end mb-6">
-          <button
-            onClick={e => { 
-              e.stopPropagation(); 
-              setShowExperienceForm(true); 
-              setExperienceForm({ entreprise: "", poste: "", date_debut: "", date_fin: "", description: "", id: null });
-              setFormError("");
-            }}
-            className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold shadow"
-          >
-            + Ajouter une expérience
-          </button>
-          <button
-            disabled={!selectedExperienceId}
-            onClick={e => {
-              e.stopPropagation();
-              const exp = experiences.find(ex => ex.id === selectedExperienceId);
-              if (exp) {
-                setExperienceForm({
-                  ...exp,
-                  date_debut: formatDateForInput(exp.date_debut),
-                  date_fin: formatDateForInput(exp.date_fin),
-                  id: exp.id
-                });
-                setShowExperienceForm(true);
+        <AuthGuard portfolioUserId={user.id}>
+          <div className="flex gap-4 justify-end mb-6">
+            <button
+              onClick={e => { 
+                e.stopPropagation(); 
+                setShowExperienceForm(true); 
+                setExperienceForm({ entreprise: "", poste: "", date_debut: "", date_fin: "", description: "", id: null });
                 setFormError("");
-              }
-            }}
-            className={`px-4 py-2 rounded font-semibold shadow
-              ${selectedExperienceId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
-          >
-            Modifier l'expérience
-          </button>
-        </div>
+              }}
+              className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold shadow"
+            >
+              + Ajouter une expérience
+            </button>
+            <button
+              disabled={!selectedExperienceId}
+              onClick={e => {
+                e.stopPropagation();
+                const exp = experiences.find(ex => ex.id === selectedExperienceId);
+                if (exp) {
+                  setExperienceForm({
+                    ...exp,
+                    date_debut: formatDateForInput(exp.date_debut),
+                    date_fin: formatDateForInput(exp.date_fin),
+                    id: exp.id
+                  });
+                  setShowExperienceForm(true);
+                  setFormError("");
+                }
+              }}
+              className={`px-4 py-2 rounded font-semibold shadow
+                ${selectedExperienceId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
+            >
+              Modifier l'expérience
+            </button>
+          </div>
+        </AuthGuard>
 
         {showExperienceForm && (
           <form
@@ -1477,39 +1488,41 @@ const techOptions = referenceSkills
 
       {/* Projects Section */}
       <section id="projects" className="py-20 px-4" onClick={clearSelections}>
-        <div className="flex gap-4 justify-end mb-6">
-          <button
-            onClick={e => { 
-              e.stopPropagation(); 
-              setShowProjectForm(true); 
-              setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
-              setFormError("");
-            }}
-            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
-          >
-            + Ajouter un projet
-          </button>
-          <button
-            disabled={!selectedProjectId}
-            onClick={e => {
-              e.stopPropagation();
-              const proj = projects.find(p => p.id === selectedProjectId);
-              if (proj) {
-                setProjectForm({
-                  ...proj,
-                  technologies: Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies || "",
-                  id: proj.id
-                });
-                setShowProjectForm(true);
+        <AuthGuard portfolioUserId={user.id}>
+          <div className="flex gap-4 justify-end mb-6">
+            <button
+              onClick={e => { 
+                e.stopPropagation(); 
+                setShowProjectForm(true); 
+                setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
                 setFormError("");
-              }
-            }}
-            className={`px-4 py-2 rounded font-semibold shadow
-              ${selectedProjectId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
-          >
-            Modifier le projet
-          </button>
-        </div>
+              }}
+              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
+            >
+              + Ajouter un projet
+            </button>
+            <button
+              disabled={!selectedProjectId}
+              onClick={e => {
+                e.stopPropagation();
+                const proj = projects.find(p => p.id === selectedProjectId);
+                if (proj) {
+                  setProjectForm({
+                    ...proj,
+                    technologies: Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies || "",
+                    id: proj.id
+                  });
+                  setShowProjectForm(true);
+                  setFormError("");
+                }
+              }}
+              className={`px-4 py-2 rounded font-semibold shadow
+                ${selectedProjectId ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-gray-700 text-gray-400 cursor-not-allowed"}`}
+            >
+              Modifier le projet
+            </button>
+          </div>
+        </AuthGuard>
 
         {showProjectForm && (
           <form
@@ -1714,35 +1727,37 @@ const techOptions = referenceSkills
 
                 <div className="flex items-center relative group">
                   <MapPin className="w-5 h-5 text-blue-400 mr-3" />
-                  {editingField === "location" ? (
-                    <>
-                      <input
-                        className="px-2 py-1 rounded bg-gray-800 text-white"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={saveEdit}
-                        disabled={savingEdit}
-                      />
-                      <button
-                        onClick={saveEdit}
-                        className="ml-2 text-green-500 font-bold"
-                        title="Valider"
-                      >✔</button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-gray-300">{user.location}</span>
-                      <button
-                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
-                        onClick={() => startEdit("location", user.location)}
-                        title="Modifier la localisation"
-                        tabIndex={-1}
-                      >
-                        <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
-                      </button>
-                    </>
-                  )}
+                  <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                    {editingField === "location" ? (
+                      <>
+                        <input
+                          className="px-2 py-1 rounded bg-gray-800 text-white"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={saveEdit}
+                          disabled={savingEdit}
+                        />
+                        <button
+                          onClick={saveEdit}
+                          className="ml-2 text-green-500 font-bold"
+                          title="Valider"
+                        >✔</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-gray-300">{user.location}</span>
+                        <button
+                          className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
+                          onClick={() => startEdit("location", user.location)}
+                          title="Modifier la localisation"
+                          tabIndex={-1}
+                        >
+                          <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
+                        </button>
+                      </>
+                    )}
+                  </AuthGuard>
                 </div>
 
 
@@ -1750,37 +1765,39 @@ const techOptions = referenceSkills
 
                 <div className="flex items-center relative group">
                   <Phone className="w-5 h-5 text-blue-400 mr-3" />
-                  {editingField === "phone" ? (
-                    <>
-                      <input
-                        className="px-2 py-1 rounded bg-gray-800 text-white"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={saveEdit}
-                        disabled={savingEdit}
-                      />
-                      <button
-                        onClick={saveEdit}
-                        className="ml-2 text-green-500 font-bold"
-                        title="Valider"
-                      >✔</button>
-                    </>
-                  ) : (
-                    <>
-                      <a href={`tel:${user.phone}`} className="text-gray-300 hover:text-white transition-colors">
-                        {user.phone}
-                      </a>
-                      <button
-                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
-                        onClick={() => startEdit("phone", user.phone)}
-                        title="Modifier le téléphone"
-                        tabIndex={-1}
-                      >
-                        <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
-                      </button>
-                    </>
-                  )}
+                  <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                    {editingField === "phone" ? (
+                      <>
+                        <input
+                          className="px-2 py-1 rounded bg-gray-800 text-white"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={saveEdit}
+                          disabled={savingEdit}
+                        />
+                        <button
+                          onClick={saveEdit}
+                          className="ml-2 text-green-500 font-bold"
+                          title="Valider"
+                        >✔</button>
+                      </>
+                    ) : (
+                      <>
+                        <a href={`tel:${user.phone}`} className="text-gray-300 hover:text-white transition-colors">
+                          {user.phone}
+                        </a>
+                        <button
+                          className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
+                          onClick={() => startEdit("phone", user.phone)}
+                          title="Modifier le téléphone"
+                          tabIndex={-1}
+                        >
+                          <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
+                        </button>
+                      </>
+                    )}
+                  </AuthGuard>
                 </div>
 
 
@@ -1789,37 +1806,39 @@ const techOptions = referenceSkills
                 
                 <div className="flex items-center relative group">
                   <Mail className="w-5 h-5 text-blue-400 mr-3" />
-                  {editingField === "email" ? (
-                    <>
-                      <input
-                        className="px-2 py-1 rounded bg-gray-800 text-white"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={saveEdit}
-                        disabled={savingEdit}
-                      />
-                      <button
-                        onClick={saveEdit}
-                        className="ml-2 text-green-500 font-bold"
-                        title="Valider"
-                      >✔</button>
-                    </>
-                  ) : (
-                    <>
-                      <a href={`mailto:${user.email}`} className="text-gray-300 hover:text-white transition-colors">
-                        {user.email}
-                      </a>
-                      <button
-                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
-                        onClick={() => startEdit("email", user.email)}
-                        title="Modifier l'email"
-                        tabIndex={-1}
-                      >
-                        <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
-                      </button>
-                    </>
-                  )}
+                  <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                    {editingField === "email" ? (
+                      <>
+                        <input
+                          className="px-2 py-1 rounded bg-gray-800 text-white"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={saveEdit}
+                          disabled={savingEdit}
+                        />
+                        <button
+                          onClick={saveEdit}
+                          className="ml-2 text-green-500 font-bold"
+                          title="Valider"
+                        >✔</button>
+                      </>
+                    ) : (
+                      <>
+                        <a href={`mailto:${user.email}`} className="text-gray-300 hover:text-white transition-colors">
+                          {user.email}
+                        </a>
+                        <button
+                          className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition"
+                          onClick={() => startEdit("email", user.email)}
+                          title="Modifier l'email"
+                          tabIndex={-1}
+                        >
+                          <Pencil className="w-4 h-4 text-blue-400 hover:text-blue-500" />
+                        </button>
+                      </>
+                    )}
+                  </AuthGuard>
                 </div>
 
               </div>
@@ -1843,35 +1862,37 @@ const techOptions = referenceSkills
                   >
                     <Pencil className="w-3 h-3 text-blue-400 hover:text-blue-500" />
                   </button>
-                  {editingField === "github_url" && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
-                      <input
-                        className="px-2 py-1 rounded bg-gray-900 text-white"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={saveEdit}
-                        onKeyDown={e => {
-                          if (e.key === "Escape") cancelEdit();
-                          if (e.key === "Enter") saveEdit();
-                        }}
-                        disabled={savingEdit}
-                        placeholder="Lien Github"
-                      />
-                      <button
-                        onClick={saveEdit}
-                        className="ml-2 text-green-500 font-bold"
-                        title="Valider"
-                        disabled={editValue === user.github_url || savingEdit}
-                      >✔</button>
-                      <button
-                        onClick={cancelEdit}
-                        className="ml-1 text-red-400 font-bold"
-                        title="Annuler"
-                        type="button"
-                      >✗</button>
-                    </div>
-                  )}
+                  <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                    {editingField === "github_url" && (
+                      <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
+                        <input
+                          className="px-2 py-1 rounded bg-gray-900 text-white"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={saveEdit}
+                          onKeyDown={e => {
+                            if (e.key === "Escape") cancelEdit();
+                            if (e.key === "Enter") saveEdit();
+                          }}
+                          disabled={savingEdit}
+                          placeholder="Lien Github"
+                        />
+                        <button
+                          onClick={saveEdit}
+                          className="ml-2 text-green-500 font-bold"
+                          title="Valider"
+                          disabled={editValue === user.github_url || savingEdit}
+                        >✔</button>
+                        <button
+                          onClick={cancelEdit}
+                          className="ml-1 text-red-400 font-bold"
+                          title="Annuler"
+                          type="button"
+                        >✗</button>
+                      </div>
+                    )}
+                  </AuthGuard>
                 </div>
                 
                 {/* LinkedIn */}
@@ -1893,35 +1914,37 @@ const techOptions = referenceSkills
                   >
                     <Pencil className="w-3 h-3 text-blue-400 hover:text-blue-500" />
                   </button>
-                  {editingField === "linkedin_url" && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
-                      <input
-                        className="px-2 py-1 rounded bg-gray-900 text-white"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={saveEdit}
-                        onKeyDown={e => {
-                          if (e.key === "Escape") cancelEdit();
-                          if (e.key === "Enter") saveEdit();
-                        }}
-                        disabled={savingEdit}
-                        placeholder="Lien Linkedin"
-                      />
-                      <button
-                        onClick={saveEdit}
-                        className="ml-2 text-green-500 font-bold"
-                        title="Valider"
-                        disabled={editValue === user.linkedin_url || savingEdit}
-                      >✔</button>
-                      <button
-                        onClick={cancelEdit}
-                        className="ml-1 text-red-400 font-bold"
-                        title="Annuler"
-                        type="button"
-                      >✗</button>
-                    </div>
-                  )}
+                  <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
+                    {editingField === "linkedin_url" && (
+                      <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
+                        <input
+                          className="px-2 py-1 rounded bg-gray-900 text-white"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={saveEdit}
+                          onKeyDown={e => {
+                            if (e.key === "Escape") cancelEdit();
+                            if (e.key === "Enter") saveEdit();
+                          }}
+                          disabled={savingEdit}
+                          placeholder="Lien Linkedin"
+                        />
+                        <button
+                          onClick={saveEdit}
+                          className="ml-2 text-green-500 font-bold"
+                          title="Valider"
+                          disabled={editValue === user.linkedin_url || savingEdit}
+                        >✔</button>
+                        <button
+                          onClick={cancelEdit}
+                          className="ml-1 text-red-400 font-bold"
+                          title="Annuler"
+                          type="button"
+                        >✗</button>
+                      </div>
+                    )}
+                  </AuthGuard>
                 </div>
               </div>
 

@@ -7,6 +7,14 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const { 
+  authenticateToken, 
+  checkOwnership, 
+  generateToken, 
+  hashPassword, 
+  verifyPassword 
+} = require('./auth');
+
 // Configuration PostgreSQL
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -29,6 +37,235 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  req.pool = pool;
+  next();
+});
+
+// ===== ROUTES D'AUTHENTIFICATION =====
+
+// Route d'inscription
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { 
+      name, 
+      email, 
+      password,
+      title,
+      description,
+      experience_years,
+      location,
+      phone,
+      github_url,
+      linkedin_url,
+      personal_website,
+      avatar_url,
+      hero_background
+    } = req.body;
+
+    // Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nom, email et mot de passe sont obligatoires' 
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Le mot de passe doit contenir au moins 6 caractères' 
+      });
+    }
+
+    if (github_url && !github_url.startsWith("https://")) {
+      newErrors.github_url = 'URL GitHub invalide';
+    }
+
+
+    // Vérifier si l'email existe déjà
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cet email est déjà utilisé' 
+      });
+    }
+
+    // Hasher le mot de passe
+    const hashedPassword = await hashPassword(password);
+
+    // Créer l'utilisateur
+    const result = await pool.query(
+      `INSERT INTO users 
+       (name, email, password, title, description, is_active, experience_years, location, phone, github_url, linkedin_url, personal_website, avatar_url, hero_background) 
+       VALUES ($1, $2, $3, $4, $5 , $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+       RETURNING id, name, email, title, description, created_at`,
+      [name, email, hashedPassword, title || null, description || null , true, experience_years || null, location || null, phone || null, github_url || null, linkedin_url || null, personal_website || null, avatar_url || null, hero_background || null]
+    );
+
+    const user = result.rows[0];
+
+    // Générer le token
+    const token = generateToken(user);
+
+    // Mettre à jour last_login
+    await pool.query(
+      'UPDATE users SET last_login = NOW() WHERE id = $1',
+      [user.id]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Inscription réussie',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        title: user.title,
+        description: user.description,
+        is_active: user.is_active,
+        experience_years: user.experience_years,
+        location: user.location,
+        phone: user.phone,
+        github_url: user.github_url,
+        linkedin_url: user.linkedin_url,
+        personal_website: user.personal_website,
+        avatar_url: user.avatar_url,
+        hero_background: user.hero_background
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur inscription:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de l\'inscription' 
+    });
+  }
+});
+
+// Route de connexion
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email et mot de passe requis' 
+      });
+    }
+
+    // Chercher l'utilisateur
+    const result = await pool.query(
+      'SELECT * FROM users WHERE email = $1 AND is_active = true',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Email ou mot de passe incorrect' 
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Vérifier le mot de passe
+    const isValid = await verifyPassword(password, user.password);
+
+    if (!isValid) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Email ou mot de passe incorrect' 
+      });
+    }
+
+    // Générer le token
+    const token = generateToken(user);
+
+    // Mettre à jour last_login
+    await pool.query(
+      'UPDATE users SET last_login = NOW() WHERE id = $1',
+      [user.id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Connexion réussie',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        title: user.title,
+        description: user.description,
+        avatar_url: user.avatar_url,
+        location: user.location,
+        github_url: user.github_url,
+        linkedin_url: user.linkedin_url,
+        personal_website: user.personal_website,
+        experience_years: user.experience_years,
+        hero_background: user.hero_background,
+        phone: user.phone
+
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur connexion:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la connexion' 
+    });
+  }
+});
+
+// Route pour vérifier le token et récupérer l'utilisateur
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, title, description, avatar_url, location, github_url, linkedin_url FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Utilisateur non trouvé' 
+      });
+    }
+
+    res.json({
+      success: true,
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erreur /me:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// Route de déconnexion (optionnel, côté client on supprime juste le token)
+app.post('/api/auth/logout', authenticateToken, (req, res) => {
+  // On pourrait invalider le token côté serveur si on le stocke
+  res.json({ 
+    success: true, 
+    message: 'Déconnexion réussie' 
+  });
+});
 
 // ===== ROUTES API AVEC POSTGRESQL =====
 
@@ -363,22 +600,27 @@ app.post('/api/admin/projects', async (req, res) => {
 });
 
 // POST /api/projects (user classique)
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', authenticateToken, async (req, res) => {
   try {
-    const { user_id, title, description, technologies, image_url, github_url, demo_url, featured = false } = req.body;
-    if (!user_id || !title || !description) {
-      return res.status(400).json({ success: false, message: "user_id, titre et description sont requis" });
+    const { title, description, technologies, image_url, github_url, demo_url, featured = false } = req.body;
+    
+    if (!title || !description) {
+      return res.status(400).json({ success: false, message: "Titre et description sont requis" });
     }
+    
+    // Forcer l'user_id à être celui de l'utilisateur connecté
     const result = await pool.query(`
       INSERT INTO projects 
       (user_id, title, description, technologies, image_url, github_url, demo_url, featured)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [
-      user_id, title, description,
+      req.user.id, // Utiliser l'ID de l'utilisateur connecté
+      title, description,
       JSON.stringify(technologies || []),
       image_url, github_url, demo_url, featured
     ]);
+    
     res.status(201).json({ success: true, message: "Projet ajouté avec succès", project: result.rows[0] });
   } catch (error) {
     console.error('Erreur création projet:', error);
@@ -400,23 +642,26 @@ app.get('/api/users/:id/projects', async (req, res) => {
 });
 
 // POST /api/skills
-app.post('/api/skills', async (req, res) => {
+app.post('/api/skills', authenticateToken, async (req, res) => {
   try {
-    const { user_id, category, items, icon_name, display_order = 0 } = req.body;
-    if (!user_id || !category || !items) {
-      return res.status(400).json({ success: false, message: "user_id, category et items sont requis" });
+    const { category, items, icon_name, display_order = 0 } = req.body;
+    
+    if (!category || !items) {
+      return res.status(400).json({ success: false, message: "Category et items sont requis" });
     }
+    
     const result = await pool.query(`
       INSERT INTO skills (user_id, category, items, icon_name, display_order)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `, [
-      user_id,
+      req.user.id, // Utiliser l'ID de l'utilisateur connecté
       category,
       JSON.stringify(items),
       icon_name || null,
       display_order
     ]);
+    
     res.status(201).json({ success: true, message: "Compétence ajoutée", skill: result.rows[0] });
   } catch (error) {
     console.error('Erreur ajout skill:', error);
@@ -504,7 +749,7 @@ app.get('/api/users/:id', async (req, res) => {
 
 
 // Supprimer un utilisateur/portfolio par ID
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', authenticateToken, checkOwnership('user'), async (req, res) => {
   try {
     const { id } = req.params;
     // Optionnel : vérifier si l'utilisateur existe avant de supprimer
@@ -521,7 +766,7 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // Route pour mettre à jour un utilisateur
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/users/:id', authenticateToken, checkOwnership('user'), async (req, res) => {
   try {
     const { id } = req.params;
     const allowedFields = [
@@ -583,7 +828,7 @@ app.put('/api/users/:id', async (req, res) => {
 })
 
 // Route pour mettre à jour un projet
-app.put('/api/projects/:id', async (req, res) => {
+app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async (req, res) => {
   try {
     const { id } = req.params;
     const { 
@@ -648,7 +893,7 @@ app.put('/api/projects/:id', async (req, res) => {
 });
 
 // Route pour mettre à jour une compétence
-app.put('/api/skills/:id', async (req, res) => {
+app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (req, res) => {
   try {
     const { id } = req.params;
     const { category, items, icon_name, display_order } = req.body;
@@ -712,7 +957,7 @@ app.put('/api/skills/:id', async (req, res) => {
 
 
 // Route pour supprimer un projet
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', authenticateToken, checkOwnership('project'), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -752,7 +997,7 @@ app.delete('/api/projects/:id', async (req, res) => {
 });
 
 // Route pour supprimer une compétence
-app.delete('/api/skills/:id', async (req, res) => {
+app.delete('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -935,27 +1180,25 @@ app.post('/api/users', async (req, res) => {
 });
 
 // POST /api/experiences - Créer une nouvelle expérience
-app.post('/api/experiences', async (req, res) => {
+app.post('/api/experiences', authenticateToken, async (req, res) => {
   try {
-    const { user_id, entreprise, poste, date_debut, date_fin, description } = req.body;
+    const { entreprise, poste, date_debut, date_fin, description } = req.body;
     
-    // Validation
-    if (!user_id || !entreprise || !poste || !date_debut) {
+    if (!entreprise || !poste || !date_debut) {
       return res.status(400).json({ 
         success: false, 
-        message: 'user_id, entreprise, poste et date_debut sont obligatoires' 
+        message: 'Entreprise, poste et date_debut sont obligatoires' 
       });
     }
     
-    // ✅ CONVERSION DES DATES : Ajouter "-01" pour les rendre compatibles PostgreSQL
-    const dateDebutFormatted = date_debut + '-01'; // "2025-03" → "2025-03-01"
-    const dateFinFormatted = date_fin ? date_fin + '-01' : null; // "2025-04" → "2025-04-01" ou null
+    const dateDebutFormatted = date_debut + '-01';
+    const dateFinFormatted = date_fin ? date_fin + '-01' : null;
     
     const result = await pool.query(
       `INSERT INTO experiences (user_id, entreprise, poste, date_debut, date_fin, description) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
-      [user_id, entreprise, poste, dateDebutFormatted, dateFinFormatted, description || '']
+      [req.user.id, entreprise, poste, dateDebutFormatted, dateFinFormatted, description || '']
     );
     
     res.status(201).json({
@@ -970,7 +1213,7 @@ app.post('/api/experiences', async (req, res) => {
 });
 
 // PUT /api/experiences/:id - Modifier une expérience
-app.put('/api/experiences/:id', async (req, res) => {
+app.put('/api/experiences/:id', authenticateToken, checkOwnership('experience'), async (req, res) => {
   try {
     const { id } = req.params;
     const { entreprise, poste, date_debut, date_fin, description } = req.body;
@@ -1012,7 +1255,7 @@ app.put('/api/experiences/:id', async (req, res) => {
 });
 
 // DELETE /api/experiences/:id - Supprimer une expérience
-app.delete('/api/experiences/:id', async (req, res) => {
+app.delete('/api/experiences/:id', authenticateToken, checkOwnership('skill'), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1048,6 +1291,206 @@ app.get('/api/users/:id/experiences', async (req, res) => {
   } catch (error) {
     console.error('Erreur récupération expériences:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// backend/server.js - Ajouter ces routes après les routes d'authentification existantes
+
+// Route pour vérifier un token de réinitialisation
+app.post('/api/auth/verify-reset-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Token manquant' 
+      });
+    }
+    
+    // Vérifier si le token existe et n'est pas expiré
+    const result = await pool.query(
+      `SELECT id, email, name 
+       FROM users 
+       WHERE reset_token = $1 
+       AND reset_token_expires > NOW()
+       AND is_active = true`,
+      [token]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Token invalide ou expiré' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Token valide' 
+    });
+    
+  } catch (error) {
+    console.error('Erreur vérification token:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
+  }
+});
+
+// Route pour réinitialiser le mot de passe avec un token
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    
+    // Validation
+    if (!token || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Token et mot de passe requis' 
+      });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Le mot de passe doit contenir au moins 6 caractères' 
+      });
+    }
+    
+    // Vérifier le token
+    const userResult = await pool.query(
+      `SELECT id, email, name 
+       FROM users 
+       WHERE reset_token = $1 
+       AND reset_token_expires > NOW()
+       AND is_active = true`,
+      [token]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Token invalide ou expiré' 
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Hasher le nouveau mot de passe
+    const hashedPassword = await hashPassword(password);
+    
+    // Mettre à jour le mot de passe et effacer le token
+    await pool.query(
+      `UPDATE users 
+       SET password = $1, 
+           reset_token = NULL, 
+           reset_token_expires = NULL,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [hashedPassword, user.id]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Mot de passe réinitialisé avec succès' 
+    });
+    
+  } catch (error) {
+    console.error('Erreur réinitialisation:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la réinitialisation' 
+    });
+  }
+});
+
+// Route pour demander une réinitialisation de mot de passe (optionnel)
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email requis' 
+      });
+    }
+    
+    // Vérifier si l'utilisateur existe
+    const userResult = await pool.query(
+      'SELECT id, name, email FROM users WHERE email = $1 AND is_active = true',
+      [email]
+    );
+    
+    if (userResult.rows.length === 0) {
+      // Pour des raisons de sécurité, on ne révèle pas si l'email existe
+      return res.json({ 
+        success: true, 
+        message: 'Si cet email existe, un lien de réinitialisation a été envoyé' 
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Générer un token de réinitialisation
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 heures
+    
+    // Sauvegarder le token
+    await pool.query(
+      'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
+      [resetToken, expires, user.id]
+    );
+    
+    // Ici, vous devriez envoyer un email avec le lien
+    // Pour le développement, on log juste le lien
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    console.log(`\n📧 Lien de réinitialisation pour ${user.email}:`);
+    console.log(resetLink);
+    console.log('\n');
+    
+    // Dans un vrai projet, utilisez un service d'email comme SendGrid, Nodemailer, etc.
+    // Exemple avec Nodemailer :
+    /*
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+    
+    await transporter.sendMail({
+      from: 'noreply@portfolio-creator.com',
+      to: user.email,
+      subject: 'Réinitialisation de votre mot de passe',
+      html: `
+        <h2>Bonjour ${user.name},</h2>
+        <p>Vous avez demandé une réinitialisation de mot de passe.</p>
+        <p>Cliquez sur le lien ci-dessous pour créer un nouveau mot de passe :</p>
+        <a href="${resetLink}" style="display: inline-block; padding: 10px 20px; background: #4F46E5; color: white; text-decoration: none; border-radius: 5px;">
+          Réinitialiser mon mot de passe
+        </a>
+        <p>Ce lien expire dans 24 heures.</p>
+        <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+      `
+    });
+    */
+    
+    res.json({ 
+      success: true, 
+      message: 'Si cet email existe, un lien de réinitialisation a été envoyé' 
+    });
+    
+  } catch (error) {
+    console.error('Erreur forgot password:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur serveur' 
+    });
   }
 });
 

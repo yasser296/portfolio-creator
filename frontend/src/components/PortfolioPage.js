@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Portfolio from './Portfolio';
 import NotFound from './NotFound';
+import { authFetch, isPortfolioOwner, getCurrentUser } from '../utils/auth';
 
 // 🚀 CACHE SIMPLE - AJOUT
 const portfolioCache = new Map();
@@ -58,6 +59,10 @@ const PortfolioPage = () => {
 
   // Mise à jour fluide pour l'utilisateur uniquement
   const updateUser = async (updatedFields) => {
+     // Vérifier d'abord si l'utilisateur est propriétaire
+    if (!isPortfolioOwner(parseInt(id))) {
+      return { success: false, message: 'Non autorisé' };
+    }
     // Mise à jour immédiate
     setData(prevData => ({
       ...prevData,
@@ -68,7 +73,7 @@ const PortfolioPage = () => {
     }));
 
     try {
-      const response = await fetch(`/api/users/${id}`, {
+      const response = await authFetch(`/api/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedFields)
@@ -156,6 +161,7 @@ const PortfolioPage = () => {
       updateExperiences={updateExperiences}
       loadData={loadData}
       invalidateCache={invalidateCache}
+      isOwner={isPortfolioOwner(data.user?.id)}
     />
   );
 };
