@@ -43,7 +43,7 @@ const LoginPage = () => {
         localStorage.setItem('user', JSON.stringify(data.user));
         
         // Rediriger vers le portfolio
-        navigate(`/portfolio/${data.user.id}`);
+        window.location.href = `/portfolio/${data.user.id}`;
       } else {
         setError(data.message || 'Erreur de connexion');
       }

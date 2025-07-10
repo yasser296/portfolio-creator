@@ -589,6 +589,8 @@ const RegisterPage = () => {
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
+        window.location.href = `/portfolio/${data.user.id}`;
+
         const userId = data.user.id;
         const authToken = data.token;
         
