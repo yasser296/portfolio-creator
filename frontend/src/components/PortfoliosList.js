@@ -8,7 +8,7 @@ const PortfoliosList = () => {
   const [filteredPortfolios, setFilteredPortfolios] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const API_URL = 'https://portfolio-creator-production.up.railway.app';
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   
   useEffect(() => {
     fetch(`${API_URL}/api/users`)
