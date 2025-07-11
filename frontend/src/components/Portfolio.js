@@ -5,6 +5,7 @@ import CreatableSelect from 'react-select/creatable';
 
 import { isPortfolioOwner, authFetch } from '../utils/auth';
 import { AuthGuard } from '../components/AuthGuard';
+import ImageUpload from './ImageUpload';
 
 import {
   ChevronDown, Mail, Phone, MapPin, Github, Linkedin, ExternalLink, Code, Palette, Server, Smartphone
@@ -1070,29 +1071,58 @@ const techOptions = referenceSkills
                 )}
               </div>
             </div>
-            <div className="relative">
-              <div className="w-48 h-48 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-6xl font-bold shadow-xl border-8 border-[#22234a] overflow-hidden mb-8">
-                {user?.avatar_url
-                  ? (
-                    <img
-                      src={user.avatar_url}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                      onError={e => { e.target.src = "https://ui-avatars.com/api/?name=?" }} // fallback simple
-                    />
-                  )
-                  : (
-                    <div className="w-full h-96 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
-                      <div className="text-8xl opacity-20">👨‍💻</div>
-                    </div>
-                  )
-                }
-              </div>
 
-              {/* <div className="w-full h-96 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
-                <div className="text-8xl opacity-20">👨‍💻</div>
-              </div> */}
-            </div>
+            <AuthGuard portfolioUserId={user.id}>
+              <div className="mb-6 z-10">
+                <ImageUpload
+                  type="avatar"
+                  currentImage={user.avatar_url}
+                  onImageUploaded={async (imageUrl) => {
+                    // Mettre à jour l'avatar
+                    const result = await updateUser({ avatar_url: imageUrl });
+                    if (result.success) {
+                      // L'avatar sera mis à jour automatiquement
+                    }
+                  }}
+                  className="w-32 h-32 mx-auto"
+                />
+              </div>
+            </AuthGuard>
+
+            {/* Version publique (non propriétaire) */}
+            {!isPortfolioOwner(user.id) && (
+              <div className="mb-6 z-10">
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name}
+                    className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-gray-700"
+                  />
+                ) : (
+                  <div className="w-32 h-32 mx-auto bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-3xl font-bold shadow-md">
+                    {user.name.split(" ").map((n) => n[0]).join("")}
+                  </div>
+                )}
+              </div>
+            )}
+
+{/* 
+            // Version publique (lecture seule) */}
+            {!isPortfolioOwner(user.id) && (
+              <div className="mb-6 z-10">
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name}
+                    className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-gray-700"
+                  />
+                ) : (
+                  <div className="w-32 h-32 mx-auto bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-3xl font-bold">
+                    {user.name?.split(" ").map((n) => n[0]).join("") || "?"}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1500,6 +1530,7 @@ const techOptions = referenceSkills
                 e.stopPropagation(); 
                 setShowProjectForm(true); 
                 setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null });
+                setEditingProject(null);
                 setFormError("");
               }}
               className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
@@ -1513,12 +1544,16 @@ const techOptions = referenceSkills
                 const proj = projects.find(p => p.id === selectedProjectId);
                 if (proj) {
                   setProjectForm({
-                    ...proj,
-                    technologies: Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies || "",
-                    id: proj.id
-                  });
-                  setShowProjectForm(true);
-                  setFormError("");
+                  title: proj.title || "",
+                  description: proj.description || "",
+                  technologies: Array.isArray(proj.technologies) ? proj.technologies.join(", ") : proj.technologies || "",
+                  image_url: proj.image_url || "",
+                  github_url: proj.github_url || "",
+                  demo_url: proj.demo_url || ""
+                });
+                setEditingProject(proj); // Set editing state
+                setShowProjectForm(true);
+                setFormError("");;
                 }
               }}
               className={`px-4 py-2 rounded font-semibold shadow
@@ -1530,14 +1565,69 @@ const techOptions = referenceSkills
         </AuthGuard>
 
         {showProjectForm && (
-          <form
-            className="bg-gray-900 p-6 rounded-xl mb-6 shadow-lg max-w-xl mx-auto flex flex-col gap-3"
-            onSubmit={handleProjectSubmit}
-          >
-            <h3 className="font-bold text-lg mb-2 text-blue-300">
-              {projectForm.id ? "Modifier le projet" : "Nouveau projet"}
-            </h3>
-            {formError && <div className="text-red-400 mb-2">{formError}</div>}
+        <form
+          className="bg-gray-900 p-6 rounded-xl mb-6 shadow-lg max-w-xl mx-auto flex flex-col gap-4"
+          onSubmit={handleProjectSubmit}
+        >
+          <h3 className="font-bold text-lg mb-2 text-blue-300">
+            {editingProject ? "Modifier le projet" : "Nouveau projet"}
+          </h3>
+          
+          {formError && (
+            <div className="text-red-400 mb-2 p-3 bg-red-900/30 rounded-lg border border-red-500/30">
+              {formError}
+            </div>
+          )}
+
+          {/* Titre du projet */}
+          <div>
+            <label className="block text-sm font-medium text-blue-300 mb-1">
+              Titre du projet *
+            </label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-blue-400 focus:outline-none"
+              placeholder="Nom de votre projet"
+              value={projectForm.title}
+              onChange={e => setProjectForm(f => ({ ...f, title: e.target.value }))}
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-blue-300 mb-1">
+              Description *
+            </label>
+            <textarea
+              className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-blue-400 focus:outline-none"
+              placeholder="Décrivez votre projet..."
+              value={projectForm.description}
+              onChange={e => setProjectForm(f => ({ ...f, description: e.target.value }))}
+              rows={3}
+              required
+            />
+          </div>
+
+          {/* Technologies - UN SEUL CHAMP avec CreatableSelect */}
+          <div>
+            <label className="block text-sm font-medium text-blue-300 mb-1">
+              Technologies utilisées
+            </label>
+            
+            {/* Sélecteur de catégorie pour filtrer les suggestions */}
+            <select
+              value={selectedTechCategory}
+              onChange={e => setSelectedTechCategory(e.target.value)}
+              className="w-full mb-2 px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-blue-400 focus:outline-none"
+            >
+              <option value="">Toutes catégories</option>
+              {availableCategories.map(cat =>
+                <option key={cat} value={cat}>{cat}</option>
+              )}
+            </select>
+
+            {/* CreatableSelect pour les technologies */}
             <CreatableSelect
               isMulti
               options={techOptions}
@@ -1556,13 +1646,15 @@ const techOptions = referenceSkills
                 }))
               }
               placeholder="Choisissez ou ajoutez les technologies utilisées"
-              className="mb-4"
               styles={{
                 control: base => ({
                   ...base,
-                  backgroundColor: '#23243a',
+                  backgroundColor: '#1f2937',
+                  borderColor: '#374151',
                   color: 'white',
-                  borderColor: '#38bdf8'
+                  '&:hover': {
+                    borderColor: '#60a5fa'
+                  }
                 }),
                 input: base => ({
                   ...base,
@@ -1570,92 +1662,109 @@ const techOptions = referenceSkills
                 }),
                 menu: base => ({
                   ...base,
-                  backgroundColor: '#2d2f42',
-                  color: 'white'
+                  backgroundColor: '#1f2937',
+                  color: 'white',
+                  border: '1px solid #374151'
                 }),
                 multiValue: base => ({
                   ...base,
-                  backgroundColor: '#38bdf8',
+                  backgroundColor: '#3b82f6',
                   color: 'white'
+                }),
+                multiValueLabel: base => ({
+                  ...base,
+                  color: 'white'
+                }),
+                multiValueRemove: base => ({
+                  ...base,
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: '#1e40af',
+                    color: 'white'
+                  }
                 }),
                 option: (base, state) => ({
                   ...base,
-                  backgroundColor: state.isFocused ? "#38bdf8" : "#23243a",
-                  color: 'white'
+                  backgroundColor: state.isFocused ? "#3b82f6" : "#1f2937",
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: "#3b82f6"
+                  }
                 }),
               }}
               maxMenuHeight={180}
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Tapez pour ajouter une nouvelle technologie ou sélectionnez dans la liste
+            </p>
+          </div>
 
-            <textarea
-              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-              placeholder="Description"
-              value={projectForm.description}
-              onChange={e => setProjectForm(f => ({ ...f, description: e.target.value }))}
-              required
+           {/* Upload d'image */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-blue-300 mb-2">
+              Image du projet
+            </label>
+            <ImageUpload
+              type="project"
+              currentImage={projectForm.image_url}
+              onImageUploaded={(imageUrl) => {
+                setProjectForm(f => ({ ...f, image_url: imageUrl }));
+              }}
             />
-            {/* Sélecteur de catégorie (optionnel) */}
-            <select
-              value={selectedTechCategory}
-              onChange={e => setSelectedTechCategory(e.target.value)}
-              className="mb-2 px-3 py-2 rounded bg-gray-800 text-white"
-            >
-              <option value="">Toutes catégories</option>
-              {availableCategories.map(cat =>
-                <option key={cat} value={cat}>{cat}</option>
-              )}
-            </select>
+          </div>
 
-            {/* Champ technologies (autocomplétion, mais aussi libre) */}
-            <input
-              type="text"
-              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-              placeholder="Technologies utilisées (séparées par virgule)"
-              value={projectForm.technologies}
-              onChange={e => setProjectForm(f => ({ ...f, technologies: e.target.value }))}
-            />
-
-            {/* Suggestions (affichées sous l'input, filtrées par catégorie sélectionnée) */}
-           
-
-            <input
-              type="url"
-              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-              placeholder="Image (URL facultative)"
-              value={projectForm.image_url}
-              onChange={e => setProjectForm(f => ({ ...f, image_url: e.target.value }))}
-            />
-            <input
-              type="url"
-              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-              placeholder="Lien GitHub (facultatif)"
-              value={projectForm.github_url}
-              onChange={e => setProjectForm(f => ({ ...f, github_url: e.target.value }))}
-            />
-            <input
-              type="url"
-              className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-              placeholder="Lien Démo (facultatif)"
-              value={projectForm.demo_url}
-              onChange={e => setProjectForm(f => ({ ...f, demo_url: e.target.value }))}
-            />
-            <div className="flex gap-4 mt-2">
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold"
-              >
-                {projectForm.id ? "Modifier" : "Ajouter"}
-              </button>
-              <button
-                type="button"
-                className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
-                onClick={() => { setShowProjectForm(false); setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "", id: null }); setEditingProject(null); }}
-              >
-                Annuler
-              </button>
+          {/* Liens */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-blue-300 mb-1">
+                Lien GitHub
+              </label>
+              <input
+                type="url"
+                className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-blue-400 focus:outline-none"
+                placeholder="https://github.com/..."
+                value={projectForm.github_url}
+                onChange={e => setProjectForm(f => ({ ...f, github_url: e.target.value }))}
+              />
             </div>
-          </form>
-        )}
+            
+            <div>
+              <label className="block text-sm font-medium text-blue-300 mb-1">
+                Lien Démo
+              </label>
+              <input
+                type="url"
+                className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-blue-400 focus:outline-none"
+                placeholder="https://monprojet.com"
+                value={projectForm.demo_url}
+                onChange={e => setProjectForm(f => ({ ...f, demo_url: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Boutons d'action */}
+          <div className="flex gap-4 mt-4">
+            <button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded text-white font-semibold transition-colors"
+            >
+              {editingProject ? "Modifier le projet" : "Ajouter le projet"}
+            </button>
+            <button
+              type="button"
+              className="bg-gray-700 hover:bg-gray-800 px-6 py-3 rounded text-white transition-colors"
+              onClick={() => { 
+                setShowProjectForm(false); 
+                setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "" }); 
+                setEditingProject(null);
+                setFormError("");
+              }}
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
 
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
@@ -1674,7 +1783,11 @@ const techOptions = referenceSkills
               ))
             ) : (
               <div className="col-span-full text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 bg-blue-500/20 rounded-full flex items-center justify-center">
+                  <span className="text-3xl">💻</span>
+                </div>
                 <p className="text-gray-400 text-lg">Aucun projet à afficher pour le moment.</p>
+                <p className="text-gray-500 text-sm">Cliquez sur "Ajouter un projet" </p>
               </div>
             )}
           </div>

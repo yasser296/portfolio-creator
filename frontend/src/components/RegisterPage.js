@@ -5,46 +5,191 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Briefcase, FileText, Plus, Edit2, Trash2 } from 'lucide-react';
 import CreatableSelect from 'react-select/creatable';
-
+import { Upload, X } from 'lucide-react';
 // ==================== COMPOSANTS MODAUX ====================
 
 function ProjectFormModal({ onClose, onSave, initialData, techOptions }) {
   const [form, setForm] = useState(
-    initialData || { title: '', description: '', technologies: '', github_url: '', demo_url: '' }
+    initialData || { 
+      title: '', 
+      description: '', 
+      technologies: '', 
+      image_url: '', // Maintenant peut être une URL ou base64
+      github_url: '', 
+      demo_url: ''  
+    }
   );
+  
+  // État pour l'image
+  const [imagePreview, setImagePreview] = useState(initialData?.image_url || '');
 
   useEffect(() => {
-    if (initialData) setForm(initialData);
+    if (initialData) {
+      setForm(initialData);
+      setImagePreview(initialData.image_url || '');
+    }
   }, [initialData]);
 
+  // Fonction pour gérer l'upload d'image
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Vérifier le type
+    if (!file.type.startsWith('image/')) {
+      alert('Veuillez sélectionner une image');
+      return;
+    }
+
+    // Vérifier la taille (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('L\'image ne doit pas dépasser 2MB');
+      return;
+    }
+
+    // Lire et compresser l'image
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Créer un canvas pour redimensionner
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Taille max : 1200x800
+        let width = img.width;
+        let height = img.height;
+        const maxWidth = 1200;
+        const maxHeight = 800;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convertir en base64 avec compression JPEG
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // Mettre à jour le formulaire et la preview
+        setImagePreview(compressedBase64);
+        setForm(f => ({ ...f, image_url: compressedBase64 }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImagePreview('');
+    setForm(f => ({ ...f, image_url: '' }));
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 ">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <form
-        className="bg-gray-900 p-6 rounded-xl shadow-lg w-full max-w-md flex flex-col gap-3"
+        className="bg-gray-900 p-6 rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onSubmit={e => {
           e.preventDefault();
           onSave(form);
           onClose();
         }}
       >
-        <h3 className="font-bold text-lg mb-2 text-blue-300">
+        <h3 className="font-bold text-xl mb-4 text-blue-300">
           {initialData ? 'Modifier le projet' : 'Ajouter un projet'}
         </h3>
+        
+        {/* Titre */}
         <input
-          className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-          placeholder="Titre"
+          className="w-full px-3 py-2 rounded bg-gray-800 text-white mb-3"
+          placeholder="Titre du projet"
           value={form.title}
           onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
           required
         />
+        
+        {/* Description */}
         <textarea
-          className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-          placeholder="Description"
+          className="w-full px-3 py-2 rounded bg-gray-800 text-white mb-3"
+          placeholder="Description du projet"
+          rows={3}
           value={form.description}
           onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
         />
-        <label className="text-sm font-semibold text-blue-300 mb-1">
-          Technologies utilisées (multi-sélection possible)
+        
+        {/* Upload d'image */}
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-blue-300 mb-2">
+            Image du projet
+          </label>
+          
+          {imagePreview ? (
+            <div className="relative group">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full h-48 object-cover rounded-lg"
+                onError={(e) => {
+                  e.target.src = 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=250&fit=crop';
+                }}
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-700 rounded-full text-white opacity-0 group-hover:opacity-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+                id="image-upload"
+              />
+              <label
+                htmlFor="image-upload"
+                className="block cursor-pointer border-2 border-dashed border-gray-600 hover:border-gray-500 rounded-lg p-4 text-center bg-gray-800/50 hover:bg-gray-800/70 transition"
+              >
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-300 text-sm">Cliquer pour ajouter une image</p>
+                <p className="text-gray-500 text-xs mt-1">JPG, PNG (max 2MB)</p>
+              </label>
+            </div>
+          )}
+          
+          {/* Option URL */}
+          <div className="mt-2">
+            <p className="text-xs text-gray-500 mb-1">Ou entrer une URL d'image :</p>
+            <input
+              type="url"
+              className="w-full px-3 py-1 rounded bg-gray-800 text-white text-sm"
+              placeholder="https://example.com/image.jpg"
+              value={imagePreview.startsWith('data:') ? '' : form.image_url}
+              onChange={e => {
+                setForm(f => ({ ...f, image_url: e.target.value }));
+                setImagePreview(e.target.value);
+              }}
+            />
+          </div>
+        </div>
+        
+        {/* Technologies */}
+        <label className="block text-sm font-semibold text-blue-300 mb-1">
+          Technologies utilisées
         </label>
         <CreatableSelect
           isMulti
@@ -62,52 +207,62 @@ function ProjectFormModal({ onClose, onSave, initialData, techOptions }) {
               technologies: selected.map(o => o.value)
             }))
           }
-          placeholder="Choisissez ou tapez les technologies"
+          placeholder="React, Node.js, PostgreSQL..."
           className="mb-4"
           styles={{
             control: base => ({
               ...base,
-              backgroundColor: '#23243a',
-              color: 'white',
-              borderColor: '#38bdf8'
+              backgroundColor: '#374151',
+              borderColor: '#4B5563'
             }),
-            input: base => ({ ...base, color: 'white' }),
-            menu: base => ({ ...base, backgroundColor: '#2d2f42', color: 'white' }),
-            multiValue: base => ({ ...base, backgroundColor: '#38bdf8', color: 'white' }),
-            option: (base, state) => ({
+            menu: base => ({
               ...base,
-              backgroundColor: state.isFocused ? "#38bdf8" : "#23243a",
+              backgroundColor: '#374151'
+            }),
+            multiValue: base => ({
+              ...base,
+              backgroundColor: '#3B82F6'
+            }),
+            input: base => ({
+              ...base,
               color: 'white'
             }),
+            option: (base, state) => ({
+              ...base,
+              backgroundColor: state.isFocused ? '#4B5563' : '#374151',
+              color: 'white'
+            })
           }}
-          maxMenuHeight={180}
         />
+        
+        {/* Liens */}
         <input
-          className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
-          placeholder="Lien vers le code (GitHub, GitLab...)"
+          className="w-full px-3 py-2 rounded bg-gray-800 text-white mb-3"
+          placeholder="Lien GitHub (optionnel)"
           type="url"
           value={form.github_url || ""}
           onChange={e => setForm(f => ({ ...f, github_url: e.target.value }))}
-          autoComplete="off"
         />
+        
         <input
-          className="px-3 py-2 rounded bg-gray-800 text-white mb-2"
+          className="w-full px-3 py-2 rounded bg-gray-800 text-white mb-4"
           placeholder="Lien démo (optionnel)"
           type="url"
           value={form.demo_url || ""}
           onChange={e => setForm(f => ({ ...f, demo_url: e.target.value }))}
-          autoComplete="off"
         />
-        <div className="flex gap-4 mt-2">
+
+        {/* Boutons */}
+        <div className="flex gap-4">
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold transition"
           >
             {initialData ? 'Modifier' : 'Ajouter'}
           </button>
           <button
             type="button"
-            className="bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white"
+            className="flex-1 bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded text-white transition"
             onClick={onClose}
           >
             Annuler

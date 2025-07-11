@@ -901,6 +901,98 @@ app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async
   }
 });
 
+const { uploadAvatar, uploadProject } = require('./config/cloudinary');
+
+// Route pour uploader un avatar
+app.post('/api/upload/avatar', authenticateToken, uploadAvatar.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Aucune image fournie' 
+      });
+    }
+
+    const imageUrl = req.file.path; // URL Cloudinary
+    const userId = req.user.id;
+
+    // Mettre à jour l'utilisateur
+    await pool.query(
+      'UPDATE users SET avatar_url = $1 WHERE id = $2',
+      [imageUrl, userId]
+    );
+
+    res.json({ 
+      success: true, 
+      imageUrl,
+      message: 'Avatar mis à jour avec succès' 
+    });
+
+  } catch (error) {
+    console.error('Erreur upload avatar:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de l\'upload' 
+    });
+  }
+});
+
+// Route pour uploader une image de projet
+app.post('/api/upload/project', authenticateToken, uploadProject.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Aucune image fournie' 
+      });
+    }
+
+    const imageUrl = req.file.path;
+
+    res.json({ 
+      success: true, 
+      imageUrl,
+      message: 'Image uploadée avec succès' 
+    });
+
+  } catch (error) {
+    console.error('Erreur upload projet:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de l\'upload' 
+    });
+  }
+});
+
+// Route pour supprimer une image
+app.delete('/api/upload/delete', authenticateToken, async (req, res) => {
+  try {
+    const { publicId } = req.body;
+    
+    if (!publicId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ID de l\'image manquant' 
+      });
+    }
+
+    // Supprimer de Cloudinary
+    await cloudinary.uploader.destroy(publicId);
+
+    res.json({ 
+      success: true, 
+      message: 'Image supprimée' 
+    });
+
+  } catch (error) {
+    console.error('Erreur suppression:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la suppression' 
+    });
+  }
+});
+
 // Route pour mettre à jour une compétence
 app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (req, res) => {
   try {
