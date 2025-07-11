@@ -893,12 +893,10 @@ app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async
       project 
     });
   } catch (error) {
-    console.error('Erreur mise à jour projet:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Erreur lors de la mise à jour' 
-    });
-  }
+  console.error('Erreur mise à jour projet:', error, error.stack); // <--- Ajoute error.stack
+  res.status(500).json({ success: false, message: 'Erreur lors de la mise à jour', details: error.message });
+}
+
 });
 
 const { uploadAvatar, uploadProject } = require('./config/cloudinary');

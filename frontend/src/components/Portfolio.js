@@ -614,47 +614,90 @@ const clearSelections = () => {
 
 
 // Pour valider l'ajout/la modification d'un projet
+// Remplacez la fonction handleProjectSubmit dans Portfolio.js par cette version avec debug :
+
 async function handleProjectSubmit(e) {
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   e.preventDefault();
   setFormError("");
+  
   if (!projectForm.title || !projectForm.description) {
     setFormError("Titre et description obligatoires.");
     return;
   }
+
   try {
-    const url = editingProject ? `${API_URL}/api/projects/${editingProject.id}` : "/api/projects";
+    // Préparer les données
+    const projectData = {
+      ...projectForm,
+      user_id: user.id,
+      technologies: projectForm.technologies
+        ? projectForm.technologies.split(",").map(s => s.trim()).filter(t => t.length > 0)
+        : []
+    };
+
+    // Nettoyer les champs vides
+    Object.keys(projectData).forEach(key => {
+      if (projectData[key] === "" || projectData[key] === null) {
+        delete projectData[key];
+      }
+    });
+
+    console.log("🚀 Données envoyées:", projectData);
+
+    const url = editingProject 
+      ? `${API_URL}/api/projects/${editingProject.id}` 
+      : `${API_URL}/api/projects`;
     const method = editingProject ? "PUT" : "POST";
+
+    console.log(`📡 ${method} ${url}`);
+
     const resp = await authFetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...projectForm,
-        user_id: user.id,
-        technologies: projectForm.technologies
-          ? projectForm.technologies.split(",").map(s => s.trim())
-          : []
-      }),
+      body: JSON.stringify(projectData),
     });
-    if (!resp.ok) throw new Error((await resp.json()).message || "Erreur inconnue");
+
+    console.log("📨 Réponse status:", resp.status);
+
+    if (!resp.ok) {
+      const errorData = await resp.json();
+      console.error("❌ Erreur serveur:", errorData);
+      throw new Error(errorData.message || `Erreur ${resp.status}`);
+    }
     
     const result = await resp.json();
+    console.log("✅ Succès:", result);
     
     // 🚀 MISE À JOUR OPTIMISTE
     if (editingProject) {
-      const updatedProjects = projects.map(p => p.id === editingProject.id ? result.project : p);
+      const updatedProjects = projects.map(p => 
+        p.id === editingProject.id ? result.project : p
+      );
       if (updateProjects) updateProjects(updatedProjects);
     } else {
       const updatedProjects = [...projects, result.project];
       if (updateProjects) updateProjects(updatedProjects);
     }
     
+    // Fermer le formulaire
     setShowProjectForm(false);
     setEditingProject(null);
     setSelectedProjectId(null);
-    setProjectForm({ title: "", description: "", technologies: "", image_url: "", github_url: "", demo_url: "" });
+    setProjectForm({ 
+      title: "", 
+      description: "", 
+      technologies: "", 
+      image_url: "", 
+      github_url: "", 
+      demo_url: "" 
+    });
+
+    console.log("🎉 Projet sauvegardé avec succès!");
+
   } catch (err) {
-    setFormError("Erreur : " + err.message);
+    console.error("💥 Erreur dans handleProjectSubmit:", err);
+    setFormError(`Erreur : ${err.message}`);
   }
 }
 
