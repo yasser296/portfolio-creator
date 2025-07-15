@@ -38,12 +38,16 @@ pool.connect()
 
 // Middleware
 app.use(cors({
-  origin: ['https://portfolio-creator-two.vercel.app', 'http://localhost:3000'],
-
+  origin: [
+    'https://portfolio-creator-two.vercel.app',
+    'http://localhost:3000',
+    'https://portfolio-creator-n7bo9nnr-yasser296s-projects.vercel.app' // <--- ajoute bien l’URL Vercel actuelle !
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
