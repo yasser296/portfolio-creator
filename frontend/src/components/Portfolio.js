@@ -19,6 +19,7 @@ const ProjectCard = React.memo(({ project, isSelected, onSelect, onDelete }) => 
       className={`group bg-gray-800 rounded-xl overflow-hidden hover:transform hover:scale-105 transition-all duration-300 border-2 cursor-pointer relative
         ${isSelected ? "border-yellow-400" : "border-transparent"}`}
     >
+      {isPortfolioOwner(project.user_id) && (
       <button
         type="button"
         className="absolute top-2 right-2 bg-blue-700 hover:bg-blue-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
@@ -28,6 +29,7 @@ const ProjectCard = React.memo(({ project, isSelected, onSelect, onDelete }) => 
       >
         ×
       </button>
+      )}
 
       <img
         src={
@@ -114,6 +116,7 @@ const SkillCard = React.memo(({ skill, isSelected, onSelect, onDelete }) => {
       className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-colors border-2 cursor-pointer group
         ${isSelected ? "border-yellow-400" : "border-transparent"}`}
     >
+    {isPortfolioOwner(skill.user_id) && (
       <button
         type="button"
         className="absolute top-2 right-2 bg-purple-700 hover:bg-purple-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
@@ -123,6 +126,7 @@ const SkillCard = React.memo(({ skill, isSelected, onSelect, onDelete }) => {
       >
         ×
       </button>
+    )}
 
       <div className="flex items-center mb-4">
         <IconComponent className="w-8 h-8 text-blue-400 mr-3" />
@@ -148,6 +152,7 @@ const ExperienceCard = React.memo(({ experience, isSelected, onSelect, onDelete,
       className={`relative bg-gray-800 rounded-xl p-6 hover:bg-gray-700 transition-all duration-300 border-2 cursor-pointer group
         ${isSelected ? "border-yellow-400" : "border-transparent"}`}
     >
+    {isPortfolioOwner(experience.user_id) && (
       <button
         type="button"
         className="absolute top-2 right-2 bg-green-700 hover:bg-green-800 text-white w-6 h-6 rounded-full flex items-center justify-center z-20 shadow opacity-0 group-hover:opacity-100 transition"
@@ -157,6 +162,7 @@ const ExperienceCard = React.memo(({ experience, isSelected, onSelect, onDelete,
       >
         ×
       </button>
+    )}
 
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
@@ -2024,6 +2030,7 @@ const techOptions = referenceSkills
                   >
                     <Github className="w-5 h-5 text-white" />
                   </a>
+                  {isPortfolioOwner(user.id) && (
                   <button
                     className="absolute -top-2 -right-2 bg-gray-800 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
                     onClick={() => startEdit("github_url", user.github_url)}
@@ -2033,6 +2040,7 @@ const techOptions = referenceSkills
                   >
                     <Pencil className="w-3 h-3 text-blue-400 hover:text-blue-500" />
                   </button>
+                  )}
                   <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
                     {editingField === "github_url" && (
                       <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
@@ -2076,6 +2084,7 @@ const techOptions = referenceSkills
                   >
                     <Linkedin className="w-5 h-5 text-white" />
                   </a>
+                  {isPortfolioOwner(user.id) && (
                   <button
                     className="absolute -top-2 -right-2 bg-gray-800 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
                     onClick={() => startEdit("linkedin_url", user.linkedin_url)}
@@ -2085,6 +2094,7 @@ const techOptions = referenceSkills
                   >
                     <Pencil className="w-3 h-3 text-blue-400 hover:text-blue-500" />
                   </button>
+                  )}
                   <AuthGuard portfolioUserId={user.id} fallback={<span>{user.name}</span>}>
                     {editingField === "linkedin_url" && (
                       <div className="absolute left-1/2 -translate-x-1/2 top-14 z-50 bg-gray-800 p-2 rounded shadow flex items-center">
