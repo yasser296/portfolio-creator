@@ -852,7 +852,7 @@ app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async
     if (title !== undefined) updates.title = title;
     if (description !== undefined) updates.description = description;
     if (technologies !== undefined) updates.technologies = JSON.stringify(technologies);
-    if (image_url !== undefined) updates.image_url = image_url;
+    if (image_url !== undefined) updates.image_url = image_url === "" ? null : image_url;
     if (github_url !== undefined) updates.github_url = github_url;
     if (demo_url !== undefined) updates.demo_url = demo_url;
     if (featured !== undefined) updates.featured = featured;

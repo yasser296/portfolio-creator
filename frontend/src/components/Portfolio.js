@@ -1137,7 +1137,7 @@ const techOptions = referenceSkills
                       // L'avatar sera mis à jour automatiquement
                     }
                   }}
-                  className="w-32 h-32 mx-auto"
+                  className="w-32 h-32 mx-auto "
                 />
               </div>
             </AuthGuard>
@@ -1161,7 +1161,7 @@ const techOptions = referenceSkills
 
 {/* 
             // Version publique (lecture seule) */}
-            {!isPortfolioOwner(user.id) && (
+            {/* {!isPortfolioOwner(user.id) && (
               <div className="mb-6 z-10">
                 {user.avatar_url ? (
                   <img
@@ -1175,7 +1175,7 @@ const techOptions = referenceSkills
                   </div>
                 )}
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </section>
