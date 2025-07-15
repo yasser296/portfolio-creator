@@ -639,9 +639,9 @@ async function handleProjectSubmit(e) {
 
     // Nettoyer les champs vides
     Object.keys(projectData).forEach(key => {
-      if (projectData[key] === "" || projectData[key] === null) {
-        delete projectData[key];
-      }
+      if ((key !== "image_url") && (projectData[key] === "" || projectData[key] === null)) {
+      delete projectData[key];
+    }
     });
 
     console.log("🚀 Données envoyées:", projectData);

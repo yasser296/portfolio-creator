@@ -103,31 +103,98 @@ const ImageUpload = ({
 
   return (
     <div className={className}>
-      {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 text-red-400 rounded-lg">
-          {error}
-        </div>
-      )}
+    {error && (
+      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 text-red-400 rounded-lg">
+        {error}
+      </div>
+    )}
 
-      {preview ? (
-        <div className="relative">
+    {/* Cas : AVATAR rempli */}
+    {preview && type === "avatar" ? (
+      <div className="relative group w-32 h-32 mx-auto">
+        <img
+          src={preview}
+          alt="Preview"
+          className="w-32 h-32 object-cover rounded-full border-4 border-blue-800 shadow-lg transition-all duration-300 group-hover:brightness-90"
+        />
+        {!uploading && (
+          <button
+            onClick={removeImage}
+            className="absolute top-1 right-1 p-2 bg-red-600 hover:bg-red-700 rounded-full text-white shadow transition opacity-0 group-hover:opacity-100"
+            title="Supprimer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+            <div className="text-white">
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-sm">Upload en cours...</p>
+            </div>
+          </div>
+        )}
+      </div>
+    ) : null}
+
+    {/* Cas : AVATAR vide */}
+    {!preview && type === "avatar" && (
+      <div
+        {...getRootProps()}
+        className={`
+          w-32 h-32 mx-auto flex flex-col items-center justify-center
+          rounded-full border-4 border-dashed
+          bg-gradient-to-br from-blue-900/70 to-purple-800/70
+          border-gray-700 text-white shadow-lg cursor-pointer
+          hover:border-blue-400 hover:shadow-2xl transition-all duration-300
+          relative
+          ${uploading ? "opacity-60 cursor-not-allowed" : ""}
+        `}
+      >
+        <input {...getInputProps()} />
+        {uploading ? (
+          <>
+            <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+            <p className="text-gray-300">Upload en cours...</p>
+          </>
+        ) : (
+          <>
+            <Upload className="w-9 h-9 mb-2 text-blue-300 opacity-80" />
+            <p className="text-gray-100 font-semibold text-sm">Photo de profil</p>
+            {/* <span className="text-gray-400 text-xs mt-">
+              JPG, PNG, GIF (max 5MB)
+            </span> */}
+          </>
+        )}
+        {/* Facultatif : Initiales (si pas d'image ET pas d’upload) */}
+        {/* {!uploading && !preview && userName && (
+          <span className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-blue-100/70 pointer-events-none select-none">
+            {userName.split(" ").map(n => n[0]).join("")}
+          </span>
+        )} */}
+      </div>
+    )}
+
+    {/* Cas : image projet (bloc rempli ou vide) */}
+    {type !== "avatar" && (
+      preview ? (
+        <div className="relative group w-full aspect-video mx-auto rounded-xl overflow-hidden shadow-lg">
           <img
             src={preview}
             alt="Preview"
-            className={`w-full rounded-lg ${
-              type === 'avatar' ? 'aspect-square object-cover' : 'aspect-video object-cover'
-            }`}
+            className="w-full h-full object-cover rounded-xl transition-all duration-300 group-hover:brightness-90"
           />
           {!uploading && (
             <button
               onClick={removeImage}
-              className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-700 rounded-full text-white transition"
+              className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-700 rounded-full text-white shadow transition opacity-0 group-hover:opacity-100"
+              title="Supprimer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           )}
           {uploading && (
-            <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
               <div className="text-white">
                 <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                 <p className="text-sm">Upload en cours...</p>
@@ -138,43 +205,37 @@ const ImageUpload = ({
       ) : (
         <div
           {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition
-            ${isDragActive 
-              ? 'border-blue-500 bg-blue-500/10' 
-              : 'border-gray-600 hover:border-gray-500 bg-gray-800/50'
-            }
-            ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
+          className={`
+            w-full aspect-video flex flex-col items-center justify-center
+            rounded-xl border-2 border-dashed border-gray-700
+            bg-gradient-to-br from-gray-800/50 to-blue-900/40
+            text-white shadow cursor-pointer
+            hover:border-blue-400 hover:shadow-xl transition-all duration-300
+            ${uploading ? "opacity-60 cursor-not-allowed" : ""}
           `}
         >
           <input {...getInputProps()} />
-          
-          <div className="flex flex-col items-center">
-            {uploading ? (
-              <>
-                <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-400">Upload en cours...</p>
-              </>
-            ) : (
-              <>
-                <Upload className="w-12 h-12 text-gray-400 mb-4" />
-                {isDragActive ? (
-                  <p className="text-blue-400">Déposez l'image ici...</p>
-                ) : (
-                  <>
-                    <p className="text-gray-300 mb-2">
-                      Glissez une image ici ou cliquez pour sélectionner
-                    </p>
-                    <p className="text-gray-500 text-sm">
-                      {type === 'avatar' ? 'JPG, PNG, GIF (max 5MB)' : 'JPG, PNG, GIF, WEBP (max 10MB)'}
-                    </p>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+          {uploading ? (
+            <>
+              <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+              <p className="text-gray-300">Upload en cours...</p>
+            </>
+          ) : (
+            <>
+              <Upload className="w-10 h-10 mb-2 text-blue-300 opacity-80" />
+              <p className="text-gray-100 font-semibold text-sm">
+                Glissez une image ou cliquez ici
+              </p>
+              <span className="text-gray-400 text-xs mt-1">
+                JPG, PNG, GIF, WEBP (max 10MB)
+              </span>
+            </>
+          )}
         </div>
-      )}
-    </div>
+      )
+    )}
+  </div>
+
   );
 };
 
