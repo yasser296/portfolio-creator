@@ -41,7 +41,7 @@ app.use(cors({
   origin: [
     'https://portfolio-creator-two.vercel.app',
     'http://localhost:3000',
-    'https://portfolio-creator-n7bo9nnr-yasser296s-projects.vercel.app' // <--- ajoute bien l’URL Vercel actuelle !
+    'https://https://portfolio-creator-n7bo09nrn-yasser296s-projects.vercel.app' // <--- ajoute bien l’URL Vercel actuelle !
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
