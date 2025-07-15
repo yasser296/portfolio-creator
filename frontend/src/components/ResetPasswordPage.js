@@ -49,7 +49,7 @@ const ResetPasswordPage = () => {
     };
     
     checkToken();
-  }, [token]);
+  }, [token, API_URL]);
 
   const handleChange = (e) => {
     setFormData({

@@ -9,11 +9,18 @@ const ImageUpload = ({
   onImageUploaded, 
   currentImage = null, 
   type = 'avatar', // 'avatar' ou 'project'
-  className = '' 
+  className = '',
+  onUploadStart,
+  onUploadError
 }) => {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(currentImage);
   const [error, setError] = useState('');
+
+  // Mettre à jour la preview quand currentImage change
+  React.useEffect(() => {
+    setPreview(currentImage);
+  }, [currentImage]);
 
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
@@ -34,6 +41,11 @@ const ImageUpload = ({
     // Upload
     setUploading(true);
     setError('');
+    
+    // Notifier le début de l'upload
+    if (onUploadStart) {
+      onUploadStart();
+    }
 
     try {
       const formData = new FormData();
@@ -57,15 +69,21 @@ const ImageUpload = ({
       } else {
         setError(data.message || 'Erreur lors de l\'upload');
         setPreview(currentImage);
+        if (onUploadError) {
+          onUploadError(data.message || 'Erreur lors de l\'upload');
+        }
       }
     } catch (err) {
       console.error('Erreur upload:', err);
       setError('Erreur de connexion au serveur');
       setPreview(currentImage);
+      if (onUploadError) {
+        onUploadError('Erreur de connexion au serveur');
+      }
     } finally {
       setUploading(false);
     }
-  }, [type, currentImage, onImageUploaded]);
+  }, [type, currentImage, onImageUploaded, onUploadStart, onUploadError]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

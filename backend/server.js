@@ -837,6 +837,9 @@ app.put('/api/users/:id', authenticateToken, checkOwnership('user'), async (req,
 })
 
 // Route pour mettre à jour un projet
+// Remplacez la route PUT /api/projects/:id dans server.js par cette version corrigée :
+
+// Route pour mettre à jour un projet
 app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -882,9 +885,14 @@ app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async
       });
     }
     
+    // S'assurer que technologies est bien parsé
     const project = {
       ...result.rows[0],
-      technologies: JSON.parse(result.rows[0].technologies || '[]')
+      technologies: result.rows[0].technologies 
+        ? (typeof result.rows[0].technologies === 'string' 
+            ? JSON.parse(result.rows[0].technologies) 
+            : result.rows[0].technologies)
+        : []
     };
     
     res.json({ 
@@ -893,10 +901,13 @@ app.put('/api/projects/:id', authenticateToken, checkOwnership('project'), async
       project 
     });
   } catch (error) {
-  console.error('Erreur mise à jour projet:', error, error.stack); // <--- Ajoute error.stack
-  res.status(500).json({ success: false, message: 'Erreur lors de la mise à jour', details: error.message });
-}
-
+    console.error('Erreur mise à jour projet:', error); 
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erreur lors de la mise à jour',
+      details: error.message 
+    });
+  }
 });
 
 const { uploadAvatar, uploadProject } = require('./config/cloudinary');

@@ -217,6 +217,7 @@ const Portfolio = ({ user, projects, skills, experiences, updateUser, updateProj
   });
 
 const [formError, setFormError] = useState("");
+const [uploadingImage, setUploadingImage] = useState(false);
 const [selectedSkillId, setSelectedSkillId] = useState(null);
 const [selectedProjectId, setSelectedProjectId] = useState(null);
 
@@ -669,15 +670,23 @@ async function handleProjectSubmit(e) {
     const result = await resp.json();
     console.log("✅ Succès:", result);
     
-    // 🚀 MISE À JOUR OPTIMISTE
-    if (editingProject) {
-      const updatedProjects = projects.map(p => 
-        p.id === editingProject.id ? result.project : p
-      );
-      if (updateProjects) updateProjects(updatedProjects);
+    // 🚀 MISE À JOUR OPTIMISTE avec vérification
+    if (result && result.project) {
+      if (editingProject) {
+        const updatedProjects = projects.map(p => 
+          p.id === editingProject.id ? result.project : p
+        );
+        if (updateProjects) updateProjects(updatedProjects);
+      } else {
+        const updatedProjects = [...projects, result.project];
+        if (updateProjects) updateProjects(updatedProjects);
+      }
     } else {
-      const updatedProjects = [...projects, result.project];
-      if (updateProjects) updateProjects(updatedProjects);
+      // Si pas de projet dans la réponse, recharger les données
+      console.warn("⚠️ Pas de projet dans la réponse, rechargement des données...");
+      if (loadData) {
+        await loadData(true);
+      }
     }
     
     // Fermer le formulaire
@@ -692,6 +701,7 @@ async function handleProjectSubmit(e) {
       github_url: "", 
       demo_url: "" 
     });
+    setUploadingImage(false);
 
     console.log("🎉 Projet sauvegardé avec succès!");
 
