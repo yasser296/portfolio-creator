@@ -326,7 +326,7 @@ async function handleExperienceSubmit(e) {
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   
   try {
-    const url = editingExperience ? `${API_URL}/api/experiences/${editingExperience.id}` : `${API_URL}//api/experiences`;
+    const url = editingExperience ? `${API_URL}/api/experiences/${editingExperience.id}` : `${API_URL}/api/experiences`;
     const method = editingExperience ? "PUT" : "POST";
     const resp = await authFetch(url, {
       method,
