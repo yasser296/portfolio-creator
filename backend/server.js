@@ -663,6 +663,20 @@ app.post('/api/skills', authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "Category et items sont requis" });
     }
     
+    // On force un array pour le stockage (backend défensif)
+    let itemsToStore = items;
+    if (Array.isArray(items)) {
+      itemsToStore = JSON.stringify(items);
+    } else if (typeof items === 'string') {
+      try {
+        // Si déjà du JSON valide, laisse tel quel
+        JSON.parse(items);
+      } catch {
+        // Sinon, on split CSV pour créer un array
+        itemsToStore = JSON.stringify(items.split(',').map(s => s.trim()));
+      }
+    }
+    
     const result = await pool.query(`
       INSERT INTO skills (user_id, category, items, icon_name, display_order)
       VALUES ($1, $2, $3, $4, $5)
@@ -670,17 +684,36 @@ app.post('/api/skills', authenticateToken, async (req, res) => {
     `, [
       req.user.id, // Utiliser l'ID de l'utilisateur connecté
       category,
-      JSON.stringify(items),
+      itemsToStore,
       icon_name || null,
       display_order
     ]);
     
-    res.status(201).json({ success: true, message: "Compétence ajoutée", skill: result.rows[0] });
+    // Assurer que la réponse côté frontend est un array
+    const skill = {
+      ...result.rows[0],
+      items: (() => {
+        const raw = result.rows[0].items;
+        if (Array.isArray(raw)) return raw;
+        if (!raw) return [];
+        if (typeof raw === 'string') {
+          try {
+            return JSON.parse(raw);
+          } catch (e) {
+            return raw.split(',').map(s => s.trim());
+          }
+        }
+        return [];
+      })()
+    };
+
+    res.status(201).json({ success: true, message: "Compétence ajoutée", skill });
   } catch (error) {
     console.error('Erreur ajout skill:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
+
 
 // GET /api/users/:id/skills
 app.get('/api/users/:id/skills', async (req, res) => {
@@ -1011,26 +1044,41 @@ app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (re
   try {
     const { id } = req.params;
     const { category, items, icon_name, display_order } = req.body;
-    
+
     const updates = {};
     if (category !== undefined) updates.category = category;
-    if (items !== undefined) updates.items = JSON.stringify(items);
+    if (items !== undefined) {
+      // Toujours stocker comme JSON (même si items est string CSV)
+      let itemsToStore = items;
+      if (Array.isArray(items)) {
+        itemsToStore = JSON.stringify(items);
+      } else if (typeof items === 'string') {
+        // Si c'est déjà du JSON, laisse tel quel, sinon split CSV
+        try {
+          JSON.parse(items);
+          itemsToStore = items;
+        } catch {
+          itemsToStore = JSON.stringify(items.split(',').map(s => s.trim()));
+        }
+      }
+      updates.items = itemsToStore;
+    }
     if (icon_name !== undefined) updates.icon_name = icon_name;
     if (display_order !== undefined) updates.display_order = display_order;
-    
+
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'Aucun champ à mettre à jour' 
       });
     }
-    
+
     const setClause = Object.keys(updates)
       .map((key, index) => `${key} = $${index + 2}`)
       .join(', ');
-    
+
     const values = [id, ...Object.values(updates)];
-    
+
     const result = await pool.query(
       `UPDATE skills 
        SET ${setClause}, updated_at = NOW() 
@@ -1038,7 +1086,7 @@ app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (re
        RETURNING *`,
       values
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
@@ -1046,23 +1094,24 @@ app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (re
       });
     }
 
-    let parsedItems;
-    try {
-      parsedItems = Array.isArray(result.rows[0].items)
-        ? result.rows[0].items
-        : JSON.parse(result.rows[0].items || '[]');
-      if (!Array.isArray(parsedItems)) {
-        parsedItems = [];
-      }
-    } catch {
-      parsedItems = [];
-    }
-
+    // 💡 Parse intelligemment le champ items
     const skill = {
       ...result.rows[0],
-      items: parsedItems
+      items: (() => {
+        const raw = result.rows[0].items;
+        if (Array.isArray(raw)) return raw;
+        if (!raw) return [];
+        if (typeof raw === 'string') {
+          try {
+            return JSON.parse(raw);
+          } catch (e) {
+            return raw.split(',').map(s => s.trim());
+          }
+        }
+        return [];
+      })()
     };
-    
+
     res.json({ 
       success: true, 
       message: 'Compétence mise à jour avec succès',
@@ -1076,6 +1125,7 @@ app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (re
     });
   }
 });
+
 
 
 
