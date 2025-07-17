@@ -1046,11 +1046,21 @@ app.put('/api/skills/:id', authenticateToken, checkOwnership('skill'), async (re
       });
     }
 
+    let parsedItems;
+    try {
+      parsedItems = Array.isArray(result.rows[0].items)
+        ? result.rows[0].items
+        : JSON.parse(result.rows[0].items || '[]');
+      if (!Array.isArray(parsedItems)) {
+        parsedItems = [];
+      }
+    } catch {
+      parsedItems = [];
+    }
+
     const skill = {
       ...result.rows[0],
-      items: Array.isArray(result.rows[0].items)
-        ? result.rows[0].items
-        : JSON.parse(result.rows[0].items || '[]')
+      items: parsedItems
     };
     
     res.json({ 
