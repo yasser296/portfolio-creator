@@ -1430,7 +1430,7 @@ app.put('/api/experiences/:id', authenticateToken, checkOwnership('experience'),
 });
 
 // DELETE /api/experiences/:id - Supprimer une expérience
-app.delete('/api/experiences/:id', authenticateToken, checkOwnership('skill'), async (req, res) => {
+app.delete('/api/experiences/:id', authenticateToken, checkOwnership('experience'), async (req, res) => {
   try {
     const { id } = req.params;
     
