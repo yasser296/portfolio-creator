@@ -815,25 +815,31 @@ async function handleSkillSubmit(e) {
     try {
       const response = await authFetch(`${API_URL}/api/contact`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contactForm)
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // Si la réponse n'est pas du JSON
+        data = {};
+      }
 
       if (response.ok) {
         setSubmitStatus({
           loading: false,
-          message: `Message envoyé avec succès ! ID: ${data.id}`,
+          message: `Message envoyé avec succès !${data.id ? ` ID: ${data.id}` : ""}`,
           type: 'success'
         });
         setContactForm({ name: '', email: '', message: '' });
-        
-        // Recharger les stats pour mettre à jour le compteur de clients
-        const newStats = await fetchAPI(`${API_URL}/stats`);
-        setStats(newStats);
+
+        // Recharger les stats seulement si le parsing a réussi
+        if (data && data.id) {
+          const newStats = await fetchAPI(`${API_URL}/stats`);
+          setStats(newStats);
+        }
       } else {
         setSubmitStatus({
           loading: false,
@@ -855,33 +861,34 @@ async function handleSkillSubmit(e) {
     }, 5000);
   };
 
+
   const SaveStatusIndicator = () => {
-  if (!saveStatus) return null;
-  
-  let bgColor = '';
-  let message = '';
-  
-  switch (saveStatus) {
-    case 'saving':
-      bgColor = 'bg-blue-600';
-      message = '⏳ Sauvegarde...';
-      break;
-    case 'success':
-      bgColor = 'bg-green-600';
-      message = '✅ Sauvegardé !';
-      break;
-    case 'error':
-      bgColor = 'bg-red-600';
-      message = '❌ Erreur';
-      break;
-  }
-  
-  return (
-    <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white ${bgColor}`}>
-      {message}
-    </div>
-  );
-};
+    if (!saveStatus) return null;
+    
+    let bgColor = '';
+    let message = '';
+    
+    switch (saveStatus) {
+      case 'saving':
+        bgColor = 'bg-blue-600';
+        message = '⏳ Sauvegarde...';
+        break;
+      case 'success':
+        bgColor = 'bg-green-600';
+        message = '✅ Sauvegardé !';
+        break;
+      case 'error':
+        bgColor = 'bg-red-600';
+        message = '❌ Erreur';
+        break;
+    }
+    
+    return (
+      <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-white ${bgColor}`}>
+        {message}
+      </div>
+    );
+  };
 
 
 
