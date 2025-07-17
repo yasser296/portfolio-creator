@@ -39,7 +39,7 @@ pool.connect()
 // Middleware
 app.use(cors({
   origin: [
-    'https://portfolio-creator-two.vercel.app',
+    'https://portfolio-creator-auuztatbb-yasser296s-projects.vercel.app',
     'http://localhost:3000',
     'https://portfolio-creator-edkuw660z-yasser296s-projects.vercel.app',
     'https://portfolio-creator-lijpyyiqd-yasser296s-projects.vercel.app' // <--- ajoute bien l’URL Vercel actuelle !
